@@ -7,6 +7,9 @@ class GoogleAuthService {
       'https://sheets.googleapis.com/$discovery/rest?version=v4'
     ];
     this.SCOPES = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.readonly openid profile email';
+    this.REDIRECT_URI = import.meta.env.PROD 
+      ? window.location.origin + '/oauth/callback'
+      : window.location.origin;
     
     this.gapi = null;
     this.tokenClient = null;
