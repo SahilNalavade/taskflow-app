@@ -36,11 +36,23 @@ function App() {
     
     // Check if user is already authenticated
     const savedUser = localStorage.getItem('user');
+    const savedTeam = localStorage.getItem('currentTeam');
     const savedMode = localStorage.getItem('appMode');
     
     if (savedUser) {
       const userData = JSON.parse(savedUser);
       setUser(userData);
+      
+      // Restore saved team if available
+      if (savedTeam) {
+        try {
+          const teamData = JSON.parse(savedTeam);
+          console.log('Restoring saved team:', teamData);
+          setCurrentTeam(teamData);
+        } catch (error) {
+          console.error('Error parsing saved team:', error);
+        }
+      }
       
       if (userData.isDemo) {
         if (userData.demoType === 'team') {
@@ -50,6 +62,10 @@ function App() {
         }
       } else if (savedMode === 'team') {
         setAppState('team');
+        // If no team is set but user should be in team mode, load teams
+        if (!savedTeam && userData.id) {
+          loadUserTeams(userData.id);
+        }
       } else {
         setAppState('personal');
       }
@@ -162,8 +178,10 @@ function App() {
       // Check if user was invited to a team and should start in team mode
       const savedTeam = localStorage.getItem('currentTeam');
       if (savedTeam) {
+        localStorage.setItem('appMode', 'team');
         setAppState('team');
       } else {
+        localStorage.setItem('appMode', 'personal');
         setAppState('personal');
       }
     } catch (error) {

@@ -191,7 +191,10 @@ const TeamMemberManagement = ({ currentUser, currentTeam, onTeamUpdate, onMember
     console.log('Team keys:', currentTeam ? Object.keys(currentTeam) : 'No team');
     
     if (!currentTeam?.id) {
-      setInviteStatus({ type: 'error', message: `No team selected. Team data: ${JSON.stringify(currentTeam)}` });
+      setInviteStatus({ 
+        type: 'error', 
+        message: 'No team selected. Please refresh the page or create a team first.' 
+      });
       return;
     }
 
@@ -382,27 +385,44 @@ const TeamMemberManagement = ({ currentUser, currentTeam, onTeamUpdate, onMember
             </p>
           </div>
           
-          {canManageMembers(currentUser.role) && (
-            <button
-              onClick={() => setShowInviteModal(true)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '10px 16px',
-                backgroundColor: '#3b82f6',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                fontSize: '14px',
-                fontWeight: '600',
-                cursor: 'pointer'
-              }}
-            >
-              <UserPlus style={{ width: '16px', height: '16px' }} />
-              Invite Member
-            </button>
-          )}
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {!currentTeam && (
+              <div style={{
+                padding: '8px 12px',
+                backgroundColor: '#fef3c7',
+                color: '#f59e0b',
+                borderRadius: '6px',
+                fontSize: '12px',
+                fontWeight: '500'
+              }}>
+                No team selected
+              </div>
+            )}
+            
+            {canManageMembers(currentUser.role) && (
+              <button
+                onClick={() => setShowInviteModal(true)}
+                disabled={!currentTeam}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '10px 16px',
+                  backgroundColor: currentTeam ? '#3b82f6' : '#9ca3af',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: currentTeam ? 'pointer' : 'not-allowed',
+                  opacity: currentTeam ? 1 : 0.6
+                }}
+              >
+                <UserPlus style={{ width: '16px', height: '16px' }} />
+                Invite Member
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
