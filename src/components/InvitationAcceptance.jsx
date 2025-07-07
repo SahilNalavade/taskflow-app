@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { CheckCircle, XCircle, Clock, User, Shield, BarChart3, Crown } from 'lucide-react';
 import { emailService } from '../services/emailService';
+import { enhancedTeamService } from '../services/enhancedTeamService';
 
 const InvitationAcceptance = ({ token, onUserJoin }) => {
   const [invitationData, setInvitationData] = useState(null);
@@ -19,8 +20,40 @@ const InvitationAcceptance = ({ token, onUserJoin }) => {
     }
   }, [token]);
 
-  const validateInvitation = () => {
+  const validateInvitation = async () => {
     try {
+      // First check if invitation exists in database
+      const dbInvitation = await enhancedTeamService.getInvitationByToken(token);
+      
+      if (dbInvitation) {
+        // Use database invitation data
+        if (dbInvitation.Status === 'Accepted') {
+          setError('This invitation has already been accepted');
+          setLoading(false);
+          return;
+        }
+        
+        if (dbInvitation.Status === 'Expired') {
+          setError('This invitation has expired');
+          setLoading(false);
+          return;
+        }
+        
+        // Get team details
+        const team = await enhancedTeamService.getTeamById(dbInvitation.Team[0]);
+        
+        setInvitationData({
+          email: dbInvitation.Email,
+          role: dbInvitation.Role,
+          teamId: dbInvitation.Team[0],
+          teamName: team ? team.Name : 'Team',
+          invitationId: dbInvitation.id
+        });
+        setLoading(false);
+        return;
+      }
+      
+      // Fallback to token-based validation
       const decodedData = emailService.decodeInvitationToken(token);
       
       if (!decodedData) {
@@ -33,6 +66,7 @@ const InvitationAcceptance = ({ token, onUserJoin }) => {
       setUserInfo(prev => ({ ...prev, name: decodedData.name || '' }));
       setLoading(false);
     } catch (error) {
+      console.error('Error validating invitation:', error);
       setError('Invalid invitation link');
       setLoading(false);
     }
@@ -53,32 +87,54 @@ const InvitationAcceptance = ({ token, onUserJoin }) => {
     setError(null);
 
     try {
-      // Create new user object
-      const newUser = {
-        id: `user_${Date.now()}`,
-        name: userInfo.name,
-        email: invitationData.email,
+      // Create or get user in database
+      let user = await enhancedTeamService.getUserByEmail(invitationData.email);
+      
+      if (!user) {
+        // Create new user
+        user = await enhancedTeamService.createUser({
+          name: userInfo.name,
+          email: invitationData.email,
+          googleId: '', // Will be filled when they sign in with Google
+          profilePicture: ''
+        });
+      }
+
+      // Add user to team
+      await enhancedTeamService.addTeamMember({
+        userId: user.id,
+        teamId: invitationData.teamId,
+        role: invitationData.role
+      });
+
+      // Update invitation status if we have invitation ID
+      if (invitationData.invitationId) {
+        await enhancedTeamService.updateInvitationStatus(invitationData.invitationId, 'Accepted');
+      }
+
+      // Create user object for app state
+      const appUser = {
+        id: user.id,
+        name: user.Name || userInfo.name,
+        email: user.Email || invitationData.email,
         role: invitationData.role,
         status: 'active',
         joinedAt: new Date().toISOString(),
-        invitedBy: invitationData.inviter,
+        teamId: invitationData.teamId,
+        teamName: invitationData.teamName,
         avatar: userInfo.name.split(' ').map(n => n[0]).join('').toUpperCase()
       };
 
-      // Update invitation status
-      emailService.updateInvitationStatus(token, 'accepted');
-
       // Notify parent component
       if (onUserJoin) {
-        onUserJoin(newUser);
+        onUserJoin(appUser);
       }
 
       // Store user info locally
-      localStorage.setItem('currentUser', JSON.stringify(newUser));
-
-      // Auto-redirect handled by parent component
+      localStorage.setItem('currentUser', JSON.stringify(appUser));
 
     } catch (error) {
+      console.error('Error accepting invitation:', error);
       setError('Failed to accept invitation. Please try again.');
       setAccepting(false);
     }

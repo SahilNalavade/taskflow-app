@@ -62,8 +62,8 @@ class EmailService {
     }
   }
 
-  // Send invitation email
-  async sendInvitationEmail(invitationData) {
+  // Send invitation email with optional team service integration
+  async sendInvitationEmail(invitationData, teamService = null) {
     if (!this.isInitialized) {
       if (!this.initialize()) {
         throw new Error('EmailJS not properly configured');
@@ -75,6 +75,7 @@ class EmailService {
       inviteeName,
       inviterName,
       teamName = 'TaskFlow Team',
+      teamId,
       role,
       message = '',
       inviterUserId
@@ -87,6 +88,22 @@ class EmailService {
 
     // Generate invitation token
     const invitationToken = this.generateInvitationToken(inviteeEmail, inviterUserId, role);
+
+    // Store invitation in database if team service is provided
+    if (teamService && teamId) {
+      try {
+        await teamService.createInvitation({
+          email: inviteeEmail,
+          teamId: teamId,
+          role: role,
+          token: invitationToken
+        });
+        console.log('Invitation stored in database');
+      } catch (error) {
+        console.error('Failed to store invitation in database:', error);
+        // Continue with email sending even if database storage fails
+      }
+    }
     
     // Create invitation URL - handle both development and production
     const baseUrl = import.meta.env.PROD 

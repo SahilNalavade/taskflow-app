@@ -8,8 +8,9 @@ import {
 import { demoData } from '../services/demoData';
 import { realtimeEngine } from '../services/realtimeEngine';
 import { emailService } from '../services/emailService';
+import { enhancedTeamService } from '../services/enhancedTeamService';
 
-const TeamMemberManagement = ({ currentUser, onTeamUpdate }) => {
+const TeamMemberManagement = ({ currentUser, currentTeam, onTeamUpdate }) => {
   const [teamMembers, setTeamMembers] = useState(demoData.teamMembers || []);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showRoleModal, setShowRoleModal] = useState(false);
@@ -92,11 +93,34 @@ const TeamMemberManagement = ({ currentUser, onTeamUpdate }) => {
     }
   ];
 
-  // Load pending invitations on component mount
+  // Load team members and pending invitations
   useEffect(() => {
-    const pending = emailService.getPendingInvitations();
-    setPendingInvitations(pending);
-  }, []);
+    loadTeamData();
+  }, [currentTeam]);
+
+  const loadTeamData = async () => {
+    if (!currentTeam?.id) {
+      // Use demo data if no team selected
+      setTeamMembers(demoData.teamMembers || []);
+      const pending = emailService.getPendingInvitations();
+      setPendingInvitations(pending);
+      return;
+    }
+
+    try {
+      // Load team members from database
+      const members = await enhancedTeamService.getTeamMembers(currentTeam.id);
+      setTeamMembers(members);
+
+      // Load pending invitations (this could be enhanced to filter by team)
+      const pending = emailService.getPendingInvitations();
+      setPendingInvitations(pending);
+    } catch (error) {
+      console.error('Error loading team data:', error);
+      // Fallback to demo data
+      setTeamMembers(demoData.teamMembers || []);
+    }
+  };
 
   const memberStats = {
     'sarah_chen': {
@@ -139,6 +163,11 @@ const TeamMemberManagement = ({ currentUser, onTeamUpdate }) => {
       return;
     }
 
+    if (!currentTeam?.id) {
+      setInviteStatus({ type: 'error', message: 'No team selected' });
+      return;
+    }
+
     setSendingInvite(true);
     setInviteStatus(null);
 
@@ -146,40 +175,29 @@ const TeamMemberManagement = ({ currentUser, onTeamUpdate }) => {
       // Initialize email service
       emailService.initialize();
 
-      // Send invitation email
+      // Send invitation email with team service integration
       const result = await emailService.sendInvitationEmail({
         inviteeEmail: inviteForm.email,
         inviteeName: inviteForm.name,
         inviterName: currentUser.name,
-        teamName: 'TaskFlow Team',
+        teamName: currentTeam.name || currentTeam.Name || 'TaskFlow Team',
+        teamId: currentTeam.id,
         role: inviteForm.role,
         message: inviteForm.message,
         inviterUserId: currentUser.id
-      });
+      }, enhancedTeamService);
 
       console.log('Invitation sent successfully:', result);
 
-      // Create pending member record
-      const newMember = {
-        id: `member_${Date.now()}`,
-        name: inviteForm.name,
-        email: inviteForm.email,
-        role: inviteForm.role,
-        avatar: inviteForm.name.split(' ').map(n => n[0]).join('').toUpperCase(),
-        status: 'pending',
-        invitedAt: new Date().toISOString(),
-        invitationToken: result.token
-      };
-
-      setTeamMembers([...teamMembers, newMember]);
-      
-      // Update pending invitations
-      const updated = emailService.getPendingInvitations();
-      setPendingInvitations(updated);
+      // Reload team data to get updated member list
+      await loadTeamData();
       
       // Emit invitation event for real-time updates
       realtimeEngine.emit('member_invited', {
-        member: newMember,
+        email: inviteForm.email,
+        name: inviteForm.name,
+        role: inviteForm.role,
+        teamId: currentTeam.id,
         invitedBy: currentUser.id,
         message: inviteForm.message,
         invitationUrl: result.invitationUrl
