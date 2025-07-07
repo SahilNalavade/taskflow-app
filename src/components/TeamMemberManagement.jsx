@@ -18,7 +18,7 @@ const TeamMemberManagement = ({ currentUser, currentTeam, onTeamUpdate }) => {
   const [inviteForm, setInviteForm] = useState({
     email: '',
     name: '',
-    role: 'member',
+    role: 'Member',
     message: ''
   });
   const [sendingInvite, setSendingInvite] = useState(false);
@@ -211,13 +211,13 @@ const TeamMemberManagement = ({ currentUser, currentTeam, onTeamUpdate }) => {
 
       // Reset form after 2 seconds
       setTimeout(() => {
-        setInviteForm({ email: '', name: '', role: 'member', message: '' });
+        setInviteForm({ email: '', name: '', role: 'Member', message: '' });
         setShowInviteModal(false);
         setInviteStatus(null);
       }, 2000);
 
       if (onTeamUpdate) {
-        onTeamUpdate([...teamMembers, newMember]);
+        onTeamUpdate(teamMembers); // Just pass current members, loadTeamData will refresh
       }
 
     } catch (error) {

@@ -336,11 +336,12 @@ class AirtableService {
     const fields = {
       Email: data.email,
       Team: [data.teamId], // Link to Teams table
-      Role: data.role || 'Member',
+      Role: data.role || 'Member', // Ensure this matches your Airtable options exactly
       Token: data.token,
       Status: 'Pending'
     };
     
+    console.log('Creating invitation with fields:', fields);
     return await this.create(this.tables.INVITATIONS, fields);
   }
 
