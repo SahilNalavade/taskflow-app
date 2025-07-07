@@ -82,6 +82,10 @@ class GoogleAuthService {
         client_id: this.CLIENT_ID,
         scope: this.SCOPES,
         callback: '', // Will be set when requesting token
+        ux_mode: 'popup',
+        error_callback: (error) => {
+          console.error('Google OAuth error:', error);
+        }
       });
 
       console.log('Google Identity Services initialized');
