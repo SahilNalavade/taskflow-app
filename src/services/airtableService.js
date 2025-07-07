@@ -170,9 +170,13 @@ class AirtableService {
     const fields = {
       Name: data.name,
       Description: data.description || '',
-      Organization: [data.organizationId], // Link to Organizations table
       Owner: [data.ownerId] // Link to Users table
     };
+    
+    // Only add Organization if provided
+    if (data.organizationId) {
+      fields.Organization = [data.organizationId];
+    }
     
     return await this.create(this.tables.TEAMS, fields);
   }
