@@ -173,11 +173,10 @@ class AirtableService {
       Owner: [data.ownerId] // Link to Users table
     };
     
-    // Only add Organization if provided
-    if (data.organizationId) {
-      fields.Organization = [data.organizationId];
-    }
+    // Note: Organization field intentionally omitted to avoid required field issues
+    // Organizations will be added in a future update when needed
     
+    console.log('Creating team with fields:', fields);
     return await this.create(this.tables.TEAMS, fields);
   }
 
@@ -186,9 +185,10 @@ class AirtableService {
       sort: [{ field: 'Name', direction: 'asc' }]
     };
     
-    if (organizationId) {
-      options.filterByFormula = `{Organization} = '${organizationId}'`;
-    }
+    // Note: Organization filtering removed since we're not using organizations yet
+    // if (organizationId) {
+    //   options.filterByFormula = `{Organization} = '${organizationId}'`;
+    // }
     
     return await this.findAll(this.tables.TEAMS, options);
   }
