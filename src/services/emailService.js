@@ -80,6 +80,11 @@ class EmailService {
       inviterUserId
     } = invitationData;
 
+    // Validate required fields
+    if (!inviteeEmail || !inviteeEmail.includes('@')) {
+      throw new Error('Valid email address is required');
+    }
+
     // Generate invitation token
     const invitationToken = this.generateInvitationToken(inviteeEmail, inviterUserId, role);
     
@@ -89,8 +94,9 @@ class EmailService {
       : 'http://localhost:3001'; // Use localhost in development
     const invitationUrl = `${baseUrl}/invite/${invitationToken}`;
 
-    // Email template parameters - simplified names
+    // Email template parameters - match EmailJS template exactly
     const templateParams = {
+      to_email: inviteeEmail,
       to_name: inviteeName || 'Team Member',
       from_name: inviterName || 'Team Admin',
       team_name: teamName || 'TaskFlow Team',
@@ -102,6 +108,12 @@ class EmailService {
     };
 
     try {
+      console.log('EmailJS Configuration:');
+      console.log('- Service ID:', this.serviceId);
+      console.log('- Template ID:', this.templateId);
+      console.log('- Public Key:', this.publicKey ? 'Present' : 'Missing');
+      console.log('- Environment:', import.meta.env.PROD ? 'Production' : 'Development');
+      
       console.log('Sending invitation email to:', inviteeEmail);
       console.log('Template params:', templateParams);
       
@@ -133,8 +145,28 @@ class EmailService {
         response: response
       };
     } catch (error) {
-      console.error('Failed to send invitation email:', error);
-      throw new Error(`Failed to send invitation: ${error.message}`);
+      console.error('EmailJS Error Details:', {
+        error: error,
+        message: error.message,
+        status: error.status,
+        text: error.text,
+        stack: error.stack
+      });
+      
+      // Provide more specific error messages
+      let errorMessage = 'Failed to send invitation email';
+      
+      if (error.status === 400) {
+        errorMessage = 'Invalid email parameters or template configuration';
+      } else if (error.status === 401) {
+        errorMessage = 'Invalid EmailJS credentials';
+      } else if (error.status === 403) {
+        errorMessage = 'EmailJS service access denied';
+      } else if (error.status === 429) {
+        errorMessage = 'Too many email requests. Please try again later';
+      }
+      
+      throw new Error(`${errorMessage}: ${error.message}`);
     }
   }
 
