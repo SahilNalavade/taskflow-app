@@ -404,8 +404,8 @@ const TeamMemberManagement = ({ currentUser, currentTeam, onTeamUpdate, onMember
       {/* Members List */}
       <div style={{ padding: '24px' }}>
         <div style={{ display: 'grid', gap: '16px' }}>
-          {teamMembers.map((member) => {
-            const roleInfo = getRoleInfo(member.role);
+          {teamMembers.filter(member => member && member.id).map((member) => {
+            const roleInfo = getRoleInfo(member.role || 'member');
             const stats = memberStats[member.id] || {
               tasksCompleted: 0,
               tasksActive: 0,
@@ -439,13 +439,13 @@ const TeamMemberManagement = ({ currentUser, currentTeam, onTeamUpdate, onMember
                       fontWeight: '600',
                       flexShrink: 0
                     }}>
-                      {member.avatar || member.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                      {member.avatar || (member.name ? member.name.split(' ').map(n => n[0]).join('').toUpperCase() : '?')}
                     </div>
 
                     <div style={{ flex: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
                         <h3 style={{ fontSize: '16px', fontWeight: '600', margin: 0 }}>
-                          {member.name}
+                          {member.name || 'Unknown Member'}
                         </h3>
                         <div style={{
                           display: 'flex',
@@ -482,7 +482,7 @@ const TeamMemberManagement = ({ currentUser, currentTeam, onTeamUpdate, onMember
                       </div>
 
                       <div style={{ color: '#6b7280', fontSize: '14px', marginBottom: '12px' }}>
-                        {member.email}
+                        {member.email || 'No email'}
                       </div>
 
                       {/* Stats */}
