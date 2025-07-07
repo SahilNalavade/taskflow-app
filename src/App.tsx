@@ -3,8 +3,7 @@ import SimpleOnboarding from './components/SimpleOnboarding';
 import DemoTaskManager from './components/DemoTaskManager';
 import DemoCollaboration from './components/DemoCollaboration';
 import GoogleSignIn from './components/GoogleSignIn';
-import ProductionPersonalDashboard from './components/ProductionPersonalDashboard';
-import ProductionTeamDashboard from './components/ProductionTeamDashboard';
+import Dashboard from './components/Dashboard';
 import InvitationAcceptance from './components/InvitationAcceptance';
 import ErrorBoundary from './components/ErrorBoundary';
 import { GlobalErrorHandler } from './components/GlobalErrorHandler';
@@ -12,16 +11,17 @@ import { demoData } from './services/demoData';
 import { enhancedTeamService } from './services/enhancedTeamService';
 import type { User, Team } from '@/types';
 
-type AppState = 'onboarding' | 'demo' | 'team-demo' | 'auth' | 'personal' | 'team' | 'invitation';
+type AppState = 'landing' | 'demo' | 'auth' | 'dashboard' | 'invitation';
 type DemoType = 'personal' | 'team';
 
 function App() {
   // App flow state
-  const [appState, setAppState] = useState<AppState>('onboarding');
+  const [appState, setAppState] = useState<AppState>('landing');
   const [user, setUser] = useState<User | null>(null);
   const [currentTeam, setCurrentTeam] = useState<Team | null>(null);
   const [invitationToken, setInvitationToken] = useState<string | null>(null);
   const [teamMemberRefreshFn, setTeamMemberRefreshFn] = useState<(() => Promise<void>) | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     // Check for invitation URL first
@@ -50,7 +50,6 @@ function App() {
     // Check if user is already authenticated
     const savedUser = localStorage.getItem('user');
     const savedTeam = localStorage.getItem('currentTeam');
-    const savedMode = localStorage.getItem('appMode');
     
     if (savedUser) {
       const userData = JSON.parse(savedUser);
@@ -68,25 +67,21 @@ function App() {
       }
       
       if (userData.isDemo) {
-        if (userData.demoType === 'team') {
-          setAppState('team-demo');
-        } else {
-          setAppState('demo');
-        }
-      } else if (savedMode === 'team') {
-        setAppState('team');
-        // If no team is set but user should be in team mode, load teams
+        setAppState('demo');
+      } else {
+        // Authenticated user - go to dashboard
+        setAppState('dashboard');
+        // If no team is set but we have a user ID, load teams
         if (!savedTeam && userData.id) {
           loadUserTeams(userData.id);
         }
-      } else {
-        setAppState('personal');
       }
     }
   }, []);
 
   // Team management functions
   const loadUserTeams = async (userId: string) => {
+    setIsLoading(true);
     try {
       const teams = await enhancedTeamService.getUserTeams(userId);
       
@@ -95,20 +90,21 @@ function App() {
         console.log('Setting current team:', teams[0]);
         setCurrentTeam(teams[0]);
         localStorage.setItem('currentTeam', JSON.stringify(teams[0]));
-        localStorage.setItem('appMode', 'team');
-        setAppState('team');
       } else {
         // User has no teams - they need to create one or be invited
-        console.log('User has no teams - showing onboarding');
+        console.log('User has no teams - showing dashboard without team');
         setCurrentTeam(null);
         localStorage.removeItem('currentTeam');
-        localStorage.setItem('appMode', 'personal');
-        setAppState('personal');
       }
+      
+      // Always go to dashboard after loading teams (or lack thereof)
+      setAppState('dashboard');
     } catch (error) {
       console.error('Error loading user teams:', error);
-      // On error, default to personal mode
-      setAppState('personal');
+      // On error, still go to dashboard but without teams
+      setAppState('dashboard');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -117,27 +113,16 @@ function App() {
     setCurrentTeam(team);
     if (team) {
       localStorage.setItem('currentTeam', JSON.stringify(team));
-      if (appState === 'personal') {
-        setAppState('team');
-      }
     } else {
       localStorage.removeItem('currentTeam');
-      if (appState === 'team') {
-        setAppState('personal');
-      }
     }
   };
 
   const handleStartDemo = (demoType: DemoType = 'personal') => {
-    // Set demo user and navigate to appropriate demo
+    // Set demo user and navigate to demo
     const demoUser: User = { ...demoData.user, demoType };
     setUser(demoUser);
-    
-    if (demoType === 'team') {
-      setAppState('team-demo');
-    } else {
-      setAppState('demo');
-    }
+    setAppState('demo');
   };
 
   const handleSignUp = () => {
@@ -175,30 +160,15 @@ function App() {
         return;
       }
       
-      // Load user's teams and set up team context
+      // Load user's teams and go to dashboard
       await loadUserTeams(dbUser.id);
-      
-      // Check if user was invited to a team and should start in team mode
-      const savedTeam = localStorage.getItem('currentTeam');
-      if (savedTeam) {
-        localStorage.setItem('appMode', 'team');
-        setAppState('team');
-      } else {
-        localStorage.setItem('appMode', 'personal');
-        setAppState('personal');
-      }
     } catch (error) {
       console.error('Error setting up user:', error);
-      // Fallback to personal mode
-      localStorage.setItem('appMode', 'personal');
-      setAppState('personal');
+      // Fallback to dashboard without teams
+      setAppState('dashboard');
     }
   };
 
-  const handleSelectMode = (mode: string) => {
-    localStorage.setItem('appMode', mode);
-    setAppState('auth');
-  };
 
   const handleAuthError = (error: Error) => {
     console.error('Authentication error:', error);
@@ -234,9 +204,8 @@ function App() {
         role: invitationData.role
       });
 
-      // Set app to team mode
-      localStorage.setItem('appMode', 'team');
-      setAppState('team');
+      // Set app to dashboard mode
+      setAppState('dashboard');
       
       // Trigger team member list refresh after a short delay
       setTimeout(async () => {
@@ -254,50 +223,14 @@ function App() {
       console.error('Error processing pending invitation:', error);
       // Still proceed to normal flow
       await loadUserTeams(dbUser.id);
-      setAppState('personal');
     }
   };
 
-  const handleUserJoin = async (userData: User) => {
-    setUser(userData);
-    localStorage.setItem('user', JSON.stringify(userData));
-    
-    // If user joined a team, load their teams and set team context
-    if (userData.teamId) {
-      try {
-        const team = await enhancedTeamService.getTeamById(userData.teamId);
-        if (team) {
-          setCurrentTeam(team);
-          localStorage.setItem('currentTeam', JSON.stringify(team));
-        }
-      } catch (error) {
-        console.error('Error loading team after join:', error);
-      }
-    }
-    
-    localStorage.setItem('appMode', 'team');
-    
-    // Clear invitation from URL
-    window.history.replaceState({}, document.title, '/');
-    setInvitationToken(null);
-    setAppState('team');
-    
-    // Trigger team member list refresh after a short delay to ensure UI is ready
-    setTimeout(async () => {
-      if (teamMemberRefreshFn) {
-        try {
-          await teamMemberRefreshFn();
-          console.log('Team member list refreshed after user join');
-        } catch (error) {
-          console.error('Error refreshing team member list:', error);
-        }
-      }
-    }, 1000);
-  };
 
   const handleCreateTeam = async (teamData: { name: string; description?: string }) => {
     if (!user?.id) return;
     
+    setIsLoading(true);
     try {
       // Create new team
       const newTeam = await enhancedTeamService.createTeam({
@@ -316,25 +249,26 @@ function App() {
       // Switch to the new team
       setCurrentTeam(newTeam);
       localStorage.setItem('currentTeam', JSON.stringify(newTeam));
-      setAppState('team');
       
       return newTeam;
     } catch (error) {
       console.error('Error creating team:', error);
       throw error;
+    } finally {
+      setIsLoading(false);
     }
   };
 
   // Render based on app state with error boundaries
   const renderContent = () => {
     switch (appState) {
-      case 'onboarding':
+      case 'landing':
         return (
           <ErrorBoundary level="page">
             <SimpleOnboarding
               onStartDemo={handleStartDemo}
               onSignIn={handleSignUp}
-              onSelectMode={handleSelectMode}
+              onSelectMode={handleSignUp}
             />
           </ErrorBoundary>
         );
@@ -342,18 +276,11 @@ function App() {
       case 'demo':
         return (
           <ErrorBoundary level="page">
-            <DemoTaskManager
-              onSignUp={handleSignUp}
-            />
-          </ErrorBoundary>
-        );
-
-      case 'team-demo':
-        return (
-          <ErrorBoundary level="page">
-            <DemoCollaboration
-              onSignUp={handleSignUp}
-            />
+            {user?.demoType === 'team' ? (
+              <DemoCollaboration onSignUp={handleSignUp} />
+            ) : (
+              <DemoTaskManager onSignUp={handleSignUp} />
+            )}
           </ErrorBoundary>
         );
 
@@ -367,16 +294,18 @@ function App() {
           </ErrorBoundary>
         );
 
-      case 'personal':
+      case 'dashboard':
         return (
           <ErrorBoundary level="page">
             <div style={{ position: 'relative' }}>
               <ErrorBoundary level="component">
-                <ProductionPersonalDashboard
+                <Dashboard
                   currentUser={user}
                   currentTeam={currentTeam}
                   onTeamChange={handleTeamChange}
                   onCreateTeam={handleCreateTeam}
+                  onMemberRefresh={setTeamMemberRefreshFn}
+                  isLoading={isLoading}
                 />
               </ErrorBoundary>
               
@@ -385,7 +314,7 @@ function App() {
                 onClick={() => {
                   localStorage.clear();
                   setUser(null);
-                  setAppState('onboarding');
+                  setAppState('landing');
                 }}
                 style={{
                   position: 'fixed',
@@ -412,49 +341,8 @@ function App() {
           <ErrorBoundary level="page">
             <InvitationAcceptance
               token={invitationToken}
-              onUserJoin={handleUserJoin}
+              onUserJoin={() => {}} // No longer needed since invitation redirects to auth
             />
-          </ErrorBoundary>
-        );
-
-      case 'team':
-        return (
-          <ErrorBoundary level="page">
-            <div style={{ position: 'relative' }}>
-              <ErrorBoundary level="component">
-                <ProductionTeamDashboard
-                  currentUser={user}
-                  currentTeam={currentTeam}
-                  onTeamChange={handleTeamChange}
-                  onCreateTeam={handleCreateTeam}
-                  onMemberRefresh={setTeamMemberRefreshFn}
-                />
-              </ErrorBoundary>
-              
-              {/* Sign Out Button (floating) */}
-              <button
-                onClick={() => {
-                  localStorage.clear();
-                  setUser(null);
-                  setAppState('onboarding');
-                }}
-                style={{
-                  position: 'fixed',
-                  top: '16px',
-                  right: '16px',
-                  padding: '8px 16px',
-                  backgroundColor: '#f3f4f6',
-                  color: '#6b7280',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '8px',
-                  fontSize: '12px',
-                  cursor: 'pointer',
-                  zIndex: 1000
-                }}
-              >
-                Sign Out
-              </button>
-            </div>
           </ErrorBoundary>
         );
 
@@ -464,7 +352,7 @@ function App() {
             <SimpleOnboarding
               onStartDemo={handleStartDemo}
               onSignIn={handleSignUp}
-              onSelectMode={handleSelectMode}
+              onSelectMode={handleSignUp}
             />
           </ErrorBoundary>
         );
