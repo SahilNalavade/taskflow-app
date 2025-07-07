@@ -1,0 +1,488 @@
+import React, { useState, useEffect } from 'react';
+import { CheckCircle, XCircle, Clock, User, Shield, BarChart3, Crown } from 'lucide-react';
+import { emailService } from '../services/emailService';
+
+const InvitationAcceptance = ({ token, onUserJoin }) => {
+  const [invitationData, setInvitationData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [accepting, setAccepting] = useState(false);
+  const [userInfo, setUserInfo] = useState({
+    name: '',
+    password: '',
+    confirmPassword: ''
+  });
+
+  useEffect(() => {
+    if (token) {
+      validateInvitation();
+    }
+  }, [token]);
+
+  const validateInvitation = () => {
+    try {
+      const decodedData = emailService.decodeInvitationToken(token);
+      
+      if (!decodedData) {
+        setError('Invalid or expired invitation link');
+        setLoading(false);
+        return;
+      }
+
+      setInvitationData(decodedData);
+      setUserInfo(prev => ({ ...prev, name: decodedData.name || '' }));
+      setLoading(false);
+    } catch (error) {
+      setError('Invalid invitation link');
+      setLoading(false);
+    }
+  };
+
+  const handleAcceptInvitation = async () => {
+    if (!userInfo.name.trim()) {
+      setError('Please enter your name');
+      return;
+    }
+
+    if (userInfo.password && userInfo.password !== userInfo.confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+
+    setAccepting(true);
+    setError(null);
+
+    try {
+      // Create new user object
+      const newUser = {
+        id: `user_${Date.now()}`,
+        name: userInfo.name,
+        email: invitationData.email,
+        role: invitationData.role,
+        status: 'active',
+        joinedAt: new Date().toISOString(),
+        invitedBy: invitationData.inviter,
+        avatar: userInfo.name.split(' ').map(n => n[0]).join('').toUpperCase()
+      };
+
+      // Update invitation status
+      emailService.updateInvitationStatus(token, 'accepted');
+
+      // Notify parent component
+      if (onUserJoin) {
+        onUserJoin(newUser);
+      }
+
+      // Store user info locally
+      localStorage.setItem('currentUser', JSON.stringify(newUser));
+
+      // Auto-redirect handled by parent component
+
+    } catch (error) {
+      setError('Failed to accept invitation. Please try again.');
+      setAccepting(false);
+    }
+  };
+
+  const getRoleIcon = (role) => {
+    const icons = {
+      'owner': Crown,
+      'admin': Shield,
+      'manager': BarChart3,
+      'member': User,
+      'viewer': User
+    };
+    return icons[role] || User;
+  };
+
+  const getRoleColor = (role) => {
+    const colors = {
+      'owner': '#7c3aed',
+      'admin': '#dc2626',
+      'manager': '#ea580c',
+      'member': '#059669',
+      'viewer': '#6b7280'
+    };
+    return colors[role] || '#6b7280';
+  };
+
+  const getRolePermissions = (role) => {
+    const permissions = {
+      'admin': [
+        'Manage team members and permissions',
+        'Create and delete projects',
+        'View team analytics and reports',
+        'Manage integrations and settings'
+      ],
+      'manager': [
+        'Assign and manage tasks',
+        'View team analytics',
+        'Invite new team members',
+        'Manage project settings'
+      ],
+      'member': [
+        'Create and edit tasks',
+        'Collaborate with comments',
+        'Update task status',
+        'View assigned projects'
+      ],
+      'viewer': [
+        'View tasks and projects',
+        'Add comments to tasks',
+        'View team activity',
+        'Export reports'
+      ]
+    };
+    
+    return permissions[role] || permissions['member'];
+  };
+
+  if (loading) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#f8fafc'
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{
+            width: '32px',
+            height: '32px',
+            border: '3px solid #f3f4f6',
+            borderTop: '3px solid #3b82f6',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite',
+            margin: '0 auto 16px'
+          }} />
+          <p style={{ color: '#6b7280' }}>Validating invitation...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error && !invitationData) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#f8fafc',
+        padding: '20px'
+      }}>
+        <div style={{
+          backgroundColor: 'white',
+          borderRadius: '12px',
+          padding: '40px',
+          textAlign: 'center',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+          maxWidth: '400px',
+          width: '100%'
+        }}>
+          <XCircle style={{ 
+            width: '48px', 
+            height: '48px', 
+            color: '#ef4444', 
+            margin: '0 auto 20px' 
+          }} />
+          <h2 style={{ 
+            fontSize: '20px', 
+            fontWeight: '600', 
+            color: '#111827', 
+            marginBottom: '8px' 
+          }}>
+            Invalid Invitation
+          </h2>
+          <p style={{ color: '#6b7280', marginBottom: '24px' }}>
+            {error}
+          </p>
+          <button
+            onClick={() => window.location.href = '/'}
+            style={{
+              padding: '10px 20px',
+              backgroundColor: '#3b82f6',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '14px',
+              fontWeight: '600',
+              cursor: 'pointer'
+            }}
+          >
+            Go to TaskFlow
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (accepting) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#f8fafc'
+      }}>
+        <div style={{
+          backgroundColor: 'white',
+          borderRadius: '12px',
+          padding: '40px',
+          textAlign: 'center',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+          maxWidth: '400px',
+          width: '100%'
+        }}>
+          <CheckCircle style={{ 
+            width: '48px', 
+            height: '48px', 
+            color: '#10b981', 
+            margin: '0 auto 20px' 
+          }} />
+          <h2 style={{ 
+            fontSize: '20px', 
+            fontWeight: '600', 
+            color: '#111827', 
+            marginBottom: '8px' 
+          }}>
+            Welcome to the team!
+          </h2>
+          <p style={{ color: '#6b7280', marginBottom: '24px' }}>
+            Your invitation has been accepted. Redirecting to TaskFlow...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const RoleIcon = getRoleIcon(invitationData.role);
+
+  return (
+    <div style={{
+      minHeight: '100vh',
+      backgroundColor: '#f8fafc',
+      padding: '20px'
+    }}>
+      {/* Header */}
+      <div style={{
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        padding: '40px 20px',
+        textAlign: 'center',
+        color: 'white'
+      }}>
+        <h1 style={{ 
+          fontSize: '32px', 
+          fontWeight: '600', 
+          margin: '0 0 8px 0' 
+        }}>
+          You're Invited!
+        </h1>
+        <p style={{ 
+          fontSize: '18px', 
+          opacity: 0.9, 
+          margin: 0 
+        }}>
+          Join TaskFlow and start collaborating
+        </p>
+      </div>
+
+      {/* Main Content */}
+      <div style={{
+        maxWidth: '600px',
+        margin: '-20px auto 0',
+        backgroundColor: 'white',
+        borderRadius: '12px',
+        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+        overflow: 'hidden'
+      }}>
+        <div style={{ padding: '40px' }}>
+          {/* Invitation Details */}
+          <div style={{
+            textAlign: 'center',
+            marginBottom: '32px'
+          }}>
+            <div style={{
+              width: '64px',
+              height: '64px',
+              backgroundColor: getRoleColor(invitationData.role),
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 16px'
+            }}>
+              <RoleIcon style={{ width: '32px', height: '32px', color: 'white' }} />
+            </div>
+            <h2 style={{
+              fontSize: '24px',
+              fontWeight: '600',
+              color: '#111827',
+              marginBottom: '8px'
+            }}>
+              Join as {invitationData.role}
+            </h2>
+            <p style={{ color: '#6b7280', fontSize: '16px' }}>
+              You've been invited to collaborate on TaskFlow
+            </p>
+          </div>
+
+          {/* Role Permissions */}
+          <div style={{
+            backgroundColor: '#f8fafc',
+            borderRadius: '8px',
+            padding: '20px',
+            marginBottom: '32px'
+          }}>
+            <h3 style={{
+              fontSize: '16px',
+              fontWeight: '600',
+              color: '#374151',
+              marginBottom: '12px'
+            }}>
+              As a {invitationData.role}, you'll be able to:
+            </h3>
+            <ul style={{
+              margin: 0,
+              paddingLeft: '20px',
+              color: '#6b7280'
+            }}>
+              {getRolePermissions(invitationData.role).map((permission, index) => (
+                <li key={index} style={{ marginBottom: '4px' }}>
+                  {permission}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* User Information Form */}
+          <div style={{ marginBottom: '32px' }}>
+            <h3 style={{
+              fontSize: '18px',
+              fontWeight: '600',
+              color: '#111827',
+              marginBottom: '16px'
+            }}>
+              Complete your profile
+            </h3>
+            
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{
+                display: 'block',
+                fontSize: '14px',
+                fontWeight: '500',
+                color: '#374151',
+                marginBottom: '4px'
+              }}>
+                Full Name *
+              </label>
+              <input
+                type="text"
+                value={userInfo.name}
+                onChange={(e) => setUserInfo({ ...userInfo, name: e.target.value })}
+                placeholder="Enter your full name"
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '8px',
+                  fontSize: '14px'
+                }}
+              />
+            </div>
+
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{
+                display: 'block',
+                fontSize: '14px',
+                fontWeight: '500',
+                color: '#374151',
+                marginBottom: '4px'
+              }}>
+                Email Address
+              </label>
+              <input
+                type="email"
+                value={invitationData.email}
+                disabled
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  backgroundColor: '#f9fafb',
+                  color: '#6b7280'
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Error Message */}
+          {error && (
+            <div style={{
+              backgroundColor: '#fef2f2',
+              border: '1px solid #fecaca',
+              borderRadius: '8px',
+              padding: '12px',
+              marginBottom: '24px'
+            }}>
+              <p style={{ color: '#ef4444', margin: 0, fontSize: '14px' }}>
+                {error}
+              </p>
+            </div>
+          )}
+
+          {/* Accept Button */}
+          <button
+            onClick={handleAcceptInvitation}
+            disabled={!userInfo.name.trim() || accepting}
+            style={{
+              width: '100%',
+              padding: '14px',
+              backgroundColor: userInfo.name.trim() ? '#3b82f6' : '#9ca3af',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '16px',
+              fontWeight: '600',
+              cursor: userInfo.name.trim() ? 'pointer' : 'not-allowed',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px'
+            }}
+          >
+            <CheckCircle style={{ width: '16px', height: '16px' }} />
+            Accept Invitation & Join Team
+          </button>
+
+          {/* Expiration Notice */}
+          <div style={{
+            textAlign: 'center',
+            marginTop: '24px',
+            padding: '16px',
+            backgroundColor: '#fffbeb',
+            borderRadius: '8px',
+            border: '1px solid #fed7aa'
+          }}>
+            <Clock style={{ 
+              width: '16px', 
+              height: '16px', 
+              color: '#f59e0b', 
+              display: 'inline',
+              marginRight: '8px' 
+            }} />
+            <span style={{ color: '#f59e0b', fontSize: '14px' }}>
+              This invitation expires in 7 days
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default InvitationAcceptance;
