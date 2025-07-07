@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronDown, Users, Plus, Building2 } from 'lucide-react';
 import { enhancedTeamService } from '../services/enhancedTeamService';
+import TeamCreationModal from './TeamCreationModal';
 
 const TeamSelector = ({ currentUser, currentTeam, onTeamChange, onCreateTeam }) => {
   const [userTeams, setUserTeams] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const [storageInfo, setStorageInfo] = useState({});
 
   useEffect(() => {
@@ -135,7 +137,7 @@ const TeamSelector = ({ currentUser, currentTeam, onTeamChange, onCreateTeam }) 
               <button
                 onClick={() => {
                   setShowDropdown(false);
-                  onCreateTeam();
+                  setShowCreateModal(true);
                 }}
                 className="w-full flex items-center gap-2 p-3 hover:bg-gray-50 transition-colors text-blue-600"
               >
@@ -168,6 +170,20 @@ const TeamSelector = ({ currentUser, currentTeam, onTeamChange, onCreateTeam }) 
           onClick={() => setShowDropdown(false)}
         />
       )}
+
+      {/* Team Creation Modal */}
+      <TeamCreationModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onCreateTeam={async (teamData) => {
+          if (onCreateTeam) {
+            const newTeam = await onCreateTeam(teamData);
+            if (newTeam) {
+              await loadUserTeams(); // Refresh the teams list
+            }
+          }
+        }}
+      />
     </div>
   );
 };

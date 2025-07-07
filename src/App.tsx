@@ -8,6 +8,7 @@ import InvitationAcceptance from './components/InvitationAcceptance';
 import ErrorBoundary from './components/ErrorBoundary';
 import { GlobalErrorHandler } from './components/GlobalErrorHandler';
 import { demoData } from './services/demoData';
+import { enhancedTeamService } from './services/enhancedTeamService';
 import type { User, Team } from '@/types';
 
 type AppState = 'onboarding' | 'demo' | 'team-demo' | 'auth' | 'personal' | 'team' | 'invitation';
@@ -54,6 +55,65 @@ function App() {
     }
   }, []);
 
+  // Team management functions
+  const loadUserTeams = async (userId: string) => {
+    try {
+      const teams = await enhancedTeamService.getUserTeams(userId);
+      
+      // If user has teams, set the first one as current
+      if (teams.length > 0) {
+        setCurrentTeam(teams[0]);
+        localStorage.setItem('currentTeam', JSON.stringify(teams[0]));
+      } else {
+        // Auto-create a default team for the user
+        await createDefaultTeam(userId);
+      }
+    } catch (error) {
+      console.error('Error loading user teams:', error);
+    }
+  };
+
+  const createDefaultTeam = async (userId: string) => {
+    try {
+      const user = await enhancedTeamService.getUserById(userId);
+      if (!user) return;
+      
+      // Create default team
+      const defaultTeam = await enhancedTeamService.createTeam({
+        name: `${user.Name || user.name || 'My'} Team`,
+        description: 'Default team workspace',
+        ownerId: userId
+      });
+
+      // Add user as team owner
+      await enhancedTeamService.addTeamMember({
+        userId: userId,
+        teamId: defaultTeam.id,
+        role: 'Admin'
+      });
+
+      setCurrentTeam(defaultTeam);
+      localStorage.setItem('currentTeam', JSON.stringify(defaultTeam));
+    } catch (error) {
+      console.error('Error creating default team:', error);
+    }
+  };
+
+  const handleTeamChange = (team: Team | null) => {
+    setCurrentTeam(team);
+    if (team) {
+      localStorage.setItem('currentTeam', JSON.stringify(team));
+      if (appState === 'personal') {
+        setAppState('team');
+      }
+    } else {
+      localStorage.removeItem('currentTeam');
+      if (appState === 'team') {
+        setAppState('personal');
+      }
+    }
+  };
+
   const handleStartDemo = (demoType: DemoType = 'personal') => {
     // Set demo user and navigate to appropriate demo
     const demoUser: User = { ...demoData.user, demoType };
@@ -70,13 +130,45 @@ function App() {
     setAppState('auth');
   };
 
-  const handleAuthSuccess = (userData: User) => {
+  const handleAuthSuccess = async (userData: User) => {
     setUser(userData);
     localStorage.setItem('user', JSON.stringify(userData));
     
-    // For now, default to personal mode - we can add mode selection later
-    localStorage.setItem('appMode', 'personal');
-    setAppState('personal');
+    try {
+      // Create or get user in database
+      let dbUser = await enhancedTeamService.getUserByEmail(userData.email);
+      
+      if (!dbUser) {
+        // Create new user in database
+        dbUser = await enhancedTeamService.createUser({
+          name: userData.name,
+          email: userData.email,
+          googleId: userData.id,
+          profilePicture: userData.picture || ''
+        });
+      }
+
+      // Update user data with database ID
+      const updatedUser = { ...userData, id: dbUser.id };
+      setUser(updatedUser);
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      
+      // Load user's teams and set up team context
+      await loadUserTeams(dbUser.id);
+      
+      // Check if user was invited to a team and should start in team mode
+      const savedTeam = localStorage.getItem('currentTeam');
+      if (savedTeam) {
+        setAppState('team');
+      } else {
+        setAppState('personal');
+      }
+    } catch (error) {
+      console.error('Error setting up user:', error);
+      // Fallback to personal mode
+      localStorage.setItem('appMode', 'personal');
+      setAppState('personal');
+    }
   };
 
   const handleSelectMode = (mode: string) => {
@@ -89,15 +181,59 @@ function App() {
     // Could show error toast here
   };
 
-  const handleUserJoin = (userData: User) => {
+  const handleUserJoin = async (userData: User) => {
     setUser(userData);
     localStorage.setItem('user', JSON.stringify(userData));
+    
+    // If user joined a team, load their teams and set team context
+    if (userData.teamId) {
+      try {
+        const team = await enhancedTeamService.getTeamById(userData.teamId);
+        if (team) {
+          setCurrentTeam(team);
+          localStorage.setItem('currentTeam', JSON.stringify(team));
+        }
+      } catch (error) {
+        console.error('Error loading team after join:', error);
+      }
+    }
+    
     localStorage.setItem('appMode', 'team');
     
     // Clear invitation from URL
     window.history.replaceState({}, document.title, '/');
     setInvitationToken(null);
     setAppState('team');
+  };
+
+  const handleCreateTeam = async (teamData: { name: string; description?: string }) => {
+    if (!user?.id) return;
+    
+    try {
+      // Create new team
+      const newTeam = await enhancedTeamService.createTeam({
+        name: teamData.name,
+        description: teamData.description || '',
+        ownerId: user.id
+      });
+
+      // Add user as team admin
+      await enhancedTeamService.addTeamMember({
+        userId: user.id,
+        teamId: newTeam.id,
+        role: 'Admin'
+      });
+
+      // Switch to the new team
+      setCurrentTeam(newTeam);
+      localStorage.setItem('currentTeam', JSON.stringify(newTeam));
+      setAppState('team');
+      
+      return newTeam;
+    } catch (error) {
+      console.error('Error creating team:', error);
+      throw error;
+    }
   };
 
   // Render based on app state with error boundaries
@@ -198,6 +334,9 @@ function App() {
               <ErrorBoundary level="component">
                 <DemoCollaboration
                   currentUser={user}
+                  currentTeam={currentTeam}
+                  onTeamChange={handleTeamChange}
+                  onCreateTeam={handleCreateTeam}
                   onSignUp={() => {
                     // Already authenticated, so maybe show upgrade options
                     console.log('User already authenticated, showing team features');

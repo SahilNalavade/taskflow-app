@@ -38,7 +38,7 @@
 **Fields:**
 - Title (Single line text) - Primary field
 - Description (Long text)
-- Status (Single select: pending, in_progress, done, blocked, cancelled)
+- Status (Single select: pending, in_progress, done, blocked, t)
 - Priority (Single select: low, medium, high, urgent)
 - Team (Link to another record → Teams table)
 - Created By (Link to another record → Users table)

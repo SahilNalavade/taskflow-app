@@ -8,11 +8,12 @@ import ConflictResolution from './ConflictResolution';
 import SyncStatusIndicator from './SyncStatusIndicator';
 import SmartNotifications from './SmartNotifications';
 import TeamMemberManagement from './TeamMemberManagement';
+import TeamSelector from './TeamSelector';
 import { demoData } from '../services/demoData';
 import { realtimeEngine } from '../services/realtimeEngine';
 import { sheetSyncService } from '../services/sheetSyncService';
 
-const DemoCollaboration = ({ onSignUp, currentUser, isAuthenticatedMode = false }) => {
+const DemoCollaboration = ({ onSignUp, currentUser, currentTeam, onTeamChange, onCreateTeam, isAuthenticatedMode = false }) => {
   const [activeView, setActiveView] = useState('board'); // 'board', 'activity', 'overview'
   const user = currentUser || demoData.user;
 
@@ -462,8 +463,20 @@ const DemoCollaboration = ({ onSignUp, currentUser, isAuthenticatedMode = false 
 
         {activeView === 'team' && (
           <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
+            {/* Team Selector */}
+            <div style={{ marginBottom: '24px' }}>
+              <TeamSelector
+                currentUser={user}
+                currentTeam={currentTeam}
+                onTeamChange={onTeamChange}
+                onCreateTeam={onCreateTeam}
+              />
+            </div>
+            
+            {/* Team Member Management */}
             <TeamMemberManagement
               currentUser={{ ...user, role: 'admin' }}
+              currentTeam={currentTeam}
               onTeamUpdate={(updatedMembers) => {
                 console.log('Team updated:', updatedMembers);
               }}
