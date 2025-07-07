@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { User, Plus, Settings } from 'lucide-react';
 import TeamSelector from './TeamSelector';
 import TeamOnboardingWizard from './TeamOnboardingWizard';
+import { ResponsiveContainer, ResponsiveHeader, ResponsiveGrid, ResponsiveCard, useResponsive } from './ui/ResponsiveLayout';
 
 const ProductionPersonalDashboard = ({ 
   currentUser, 
@@ -11,6 +12,7 @@ const ProductionPersonalDashboard = ({
 }) => {
   const [showCreateTeamHelp, setShowCreateTeamHelp] = useState(false);
   const [showOnboardingWizard, setShowOnboardingWizard] = useState(false);
+  const { isMobile } = useResponsive();
 
   if (!currentUser) {
     return (
@@ -34,68 +36,50 @@ const ProductionPersonalDashboard = ({
       minHeight: '100vh',
       backgroundColor: '#f8fafc'
     }}>
-      {/* Header */}
-      <div style={{
-        backgroundColor: 'white',
-        borderBottom: '1px solid #e5e7eb',
-        padding: '16px 24px'
-      }}>
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          maxWidth: '1200px',
-          margin: '0 auto'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <h1 style={{
-              fontSize: '24px',
-              fontWeight: '700',
-              color: '#111827',
-              margin: 0
+      {/* Responsive Header */}
+      <ResponsiveHeader
+        title="TaskFlow"
+        actions={
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            {!isMobile && (
+              <TeamSelector
+                currentTeam={currentTeam}
+                currentUser={currentUser}
+                onTeamChange={onTeamChange}
+                onCreateTeam={onCreateTeam}
+              />
+            )}
+            {/* User Info */}
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '8px',
+              color: '#6b7280',
+              fontSize: '14px'
             }}>
-              TaskFlow
-            </h1>
-            
-            {/* Team Selector */}
+              <User style={{ width: '16px', height: '16px' }} />
+              {isMobile ? currentUser.name?.split(' ')[0] : currentUser.name}
+            </div>
+          </div>
+        }
+        navigation={
+          isMobile ? (
             <TeamSelector
               currentTeam={currentTeam}
               currentUser={currentUser}
               onTeamChange={onTeamChange}
               onCreateTeam={onCreateTeam}
             />
-          </div>
-
-          {/* User Info */}
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: '8px',
-            color: '#6b7280',
-            fontSize: '14px'
-          }}>
-            <User style={{ width: '16px', height: '16px' }} />
-            {currentUser.name}
-          </div>
-        </div>
-      </div>
+          ) : null
+        }
+      />
 
       {/* Main Content */}
-      <div style={{
-        maxWidth: '1200px',
-        margin: '0 auto',
-        padding: '24px'
-      }}>
+      <ResponsiveContainer maxWidth="xl" className="py-6">
         {/* Welcome Section */}
-        <div style={{
-          backgroundColor: 'white',
-          borderRadius: '12px',
-          padding: '32px',
-          border: '1px solid #e5e7eb',
-          marginBottom: '24px'
-        }}>
+        <ResponsiveCard padding={true} className="mb-6">
           <h2 style={{
-            fontSize: '28px',
+            fontSize: isMobile ? '24px' : '28px',
             fontWeight: '700',
             color: '#111827',
             marginBottom: '8px'
@@ -104,41 +88,30 @@ const ProductionPersonalDashboard = ({
           </h2>
           <p style={{
             color: '#6b7280',
-            fontSize: '16px',
+            fontSize: isMobile ? '14px' : '16px',
             marginBottom: '24px'
           }}>
             Get started by creating a team or joining an existing one.
           </p>
-        </div>
+        </ResponsiveCard>
 
         {/* Getting Started Cards */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-          gap: '24px'
-        }}>
+        <ResponsiveGrid 
+          columns={{ sm: 1, md: 2, lg: 2 }}
+          gap={isMobile ? '16px' : '24px'}
+        >
           {/* Create Team Card */}
-          <div style={{
-            backgroundColor: 'white',
-            borderRadius: '12px',
-            padding: '24px',
-            border: '1px solid #e5e7eb',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease'
-          }}
-          onClick={() => setShowOnboardingWizard(true)}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.borderColor = '#3b82f6';
-            e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.15)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.borderColor = '#e5e7eb';
-            e.currentTarget.style.boxShadow = 'none';
-          }}
+          <ResponsiveCard 
+            hover={true}
+            style={{
+              cursor: 'pointer',
+              transition: 'all 0.2s ease'
+            }}
+            onClick={() => setShowOnboardingWizard(true)}
           >
             <div style={{
-              width: '48px',
-              height: '48px',
+              width: isMobile ? '40px' : '48px',
+              height: isMobile ? '40px' : '48px',
               backgroundColor: '#eff6ff',
               borderRadius: '12px',
               display: 'flex',
@@ -146,10 +119,14 @@ const ProductionPersonalDashboard = ({
               justifyContent: 'center',
               marginBottom: '16px'
             }}>
-              <Plus style={{ width: '24px', height: '24px', color: '#3b82f6' }} />
+              <Plus style={{ 
+                width: isMobile ? '20px' : '24px', 
+                height: isMobile ? '20px' : '24px', 
+                color: '#3b82f6' 
+              }} />
             </div>
             <h3 style={{
-              fontSize: '18px',
+              fontSize: isMobile ? '16px' : '18px',
               fontWeight: '600',
               color: '#111827',
               marginBottom: '8px'
@@ -163,18 +140,13 @@ const ProductionPersonalDashboard = ({
             }}>
               Start collaborating by creating your own team workspace. Invite members and manage projects together.
             </p>
-          </div>
+          </ResponsiveCard>
 
           {/* Join Team Card */}
-          <div style={{
-            backgroundColor: 'white',
-            borderRadius: '12px',
-            padding: '24px',
-            border: '1px solid #e5e7eb'
-          }}>
+          <ResponsiveCard>
             <div style={{
-              width: '48px',
-              height: '48px',
+              width: isMobile ? '40px' : '48px',
+              height: isMobile ? '40px' : '48px',
               backgroundColor: '#f0fdf4',
               borderRadius: '12px',
               display: 'flex',
@@ -182,10 +154,14 @@ const ProductionPersonalDashboard = ({
               justifyContent: 'center',
               marginBottom: '16px'
             }}>
-              <User style={{ width: '24px', height: '24px', color: '#059669' }} />
+              <User style={{ 
+                width: isMobile ? '20px' : '24px', 
+                height: isMobile ? '20px' : '24px', 
+                color: '#059669' 
+              }} />
             </div>
             <h3 style={{
-              fontSize: '18px',
+              fontSize: isMobile ? '16px' : '18px',
               fontWeight: '600',
               color: '#111827',
               marginBottom: '8px'
@@ -210,8 +186,8 @@ const ProductionPersonalDashboard = ({
             }}>
               💡 Tip: Check your email for any pending invitations
             </div>
-          </div>
-        </div>
+          </ResponsiveCard>
+        </ResponsiveGrid>
 
         {/* Create Team Help Modal */}
         {showCreateTeamHelp && (

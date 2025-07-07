@@ -11,6 +11,7 @@ import { demoData } from './services/demoData';
 import { enhancedTeamService } from './services/enhancedTeamService';
 import { ToastContainer } from './components/Toast';
 import { useToast } from './hooks/useToast';
+import { SkipLink, useAnnouncer } from './components/ui/AccessibleComponents';
 import type { User, Team } from '@/types';
 
 type AppState = 'landing' | 'demo' | 'auth' | 'dashboard' | 'invitation';
@@ -25,6 +26,7 @@ function App() {
   const [teamMemberRefreshFn, setTeamMemberRefreshFn] = useState<(() => Promise<void>) | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const toast = useToast();
+  const announcer = useAnnouncer();
 
   useEffect(() => {
     // Check for invitation URL first
@@ -372,7 +374,11 @@ function App() {
   return (
     <GlobalErrorHandler>
       <ErrorBoundary level="critical">
-        {renderContent()}
+        <SkipLink href="#main-content" />
+        <announcer.LiveRegion />
+        <div id="main-content">
+          {renderContent()}
+        </div>
         <ToastContainer 
           toasts={toast.toasts} 
           onRemoveToast={toast.removeToast} 

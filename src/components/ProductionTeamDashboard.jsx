@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Users, Activity, MessageCircle, Settings } from 'lucide-react';
+import { Users, Activity, MessageCircle, Settings, Menu, X } from 'lucide-react';
 import TeamTaskBoard from './TeamTaskBoard';
 import ActivityFeed from './ActivityFeed';
-import TeamMemberManagement from './TeamMemberManagement';
+import ImprovedTeamMemberManagement from './ImprovedTeamMemberManagement';
 import TeamSelector from './TeamSelector';
+import { ResponsiveContainer, ResponsiveHeader, ResponsiveButton, ResponsiveCard, useResponsive } from './ui/ResponsiveLayout';
 
 const ProductionTeamDashboard = ({ 
   currentUser, 
@@ -13,6 +14,8 @@ const ProductionTeamDashboard = ({
   onMemberRefresh 
 }) => {
   const [activeView, setActiveView] = useState('board');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { isMobile, isTablet } = useResponsive();
 
   const views = [
     { key: 'board', label: 'Task Board', icon: Users },
@@ -29,116 +32,168 @@ const ProductionTeamDashboard = ({
         justifyContent: 'center',
         backgroundColor: '#f8fafc'
       }}>
-        <div style={{ textAlign: 'center' }}>
-          <h2>Authentication Required</h2>
-          <p>Please sign in to access the team dashboard.</p>
-        </div>
+        <ResponsiveContainer>
+          <div style={{ textAlign: 'center' }}>
+            <h2>Authentication Required</h2>
+            <p>Please sign in to access the team dashboard.</p>
+          </div>
+        </ResponsiveContainer>
       </div>
     );
   }
+
+  const renderNavigation = () => {
+    if (isMobile) {
+      return (
+        <>
+          {/* Mobile Navigation Button */}
+          <ResponsiveButton
+            variant="ghost"
+            size="sm"
+            icon={mobileMenuOpen ? <X /> : <Menu />}
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label="Toggle navigation menu"
+          >
+            {mobileMenuOpen ? '' : ''}
+          </ResponsiveButton>
+          
+          {/* Mobile Navigation Overlay */}
+          {mobileMenuOpen && (
+            <div style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              zIndex: 1000,
+              display: 'flex',
+              alignItems: 'flex-start',
+              justifyContent: 'flex-end',
+              paddingTop: '64px'
+            }}>
+              <div style={{
+                backgroundColor: 'white',
+                borderRadius: '8px 0 0 8px',
+                padding: '16px',
+                minWidth: '200px',
+                maxWidth: '280px',
+                boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
+                marginRight: '16px'
+              }}>
+                {views.map((view) => (
+                  <button
+                    key={view.key}
+                    onClick={() => {
+                      setActiveView(view.key);
+                      setMobileMenuOpen(false);
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      padding: '12px 16px',
+                      backgroundColor: activeView === view.key ? '#eff6ff' : 'transparent',
+                      color: activeView === view.key ? '#3b82f6' : '#374151',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontSize: '16px',
+                      fontWeight: '500',
+                      cursor: 'pointer',
+                      width: '100%',
+                      textAlign: 'left',
+                      marginBottom: '4px'
+                    }}
+                  >
+                    <view.icon style={{ width: '20px', height: '20px' }} />
+                    {view.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      );
+    }
+
+    return views.map((view) => (
+      <ResponsiveButton
+        key={view.key}
+        variant={activeView === view.key ? 'primary' : 'ghost'}
+        size="sm"
+        icon={<view.icon style={{ width: '16px', height: '16px' }} />}
+        onClick={() => setActiveView(view.key)}
+      >
+        {isTablet ? '' : view.label}
+      </ResponsiveButton>
+    ));
+  };
 
   return (
     <div style={{
       minHeight: '100vh',
       backgroundColor: '#f8fafc'
     }}>
-      {/* Header */}
-      <div style={{
-        backgroundColor: 'white',
-        borderBottom: '1px solid #e5e7eb',
-        padding: '16px 24px'
-      }}>
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          maxWidth: '1200px',
-          margin: '0 auto'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <h1 style={{
-              fontSize: '24px',
-              fontWeight: '700',
-              color: '#111827',
-              margin: 0
-            }}>
-              TaskFlow
-            </h1>
-            
-            {/* Team Selector */}
+      {/* Responsive Header */}
+      <ResponsiveHeader
+        title="TaskFlow"
+        actions={
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            {!isMobile && (
+              <TeamSelector
+                currentTeam={currentTeam}
+                currentUser={currentUser}
+                onTeamChange={onTeamChange}
+                onCreateTeam={onCreateTeam}
+              />
+            )}
+            {renderNavigation()}
+          </div>
+        }
+        navigation={
+          isMobile ? (
             <TeamSelector
               currentTeam={currentTeam}
               currentUser={currentUser}
               onTeamChange={onTeamChange}
               onCreateTeam={onCreateTeam}
             />
-          </div>
-
-          {/* Navigation */}
-          <div style={{ display: 'flex', gap: '8px' }}>
-            {views.map((view) => (
-              <button
-                key={view.key}
-                onClick={() => setActiveView(view.key)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '8px 16px',
-                  backgroundColor: activeView === view.key ? '#3b82f6' : 'transparent',
-                  color: activeView === view.key ? 'white' : '#6b7280',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  cursor: 'pointer'
-                }}
-              >
-                <view.icon style={{ width: '16px', height: '16px' }} />
-                {view.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
+          ) : null
+        }
+      />
 
       {/* Main Content */}
-      <div style={{
-        maxWidth: '1200px',
-        margin: '0 auto',
-        padding: '24px'
-      }}>
+      <ResponsiveContainer maxWidth="xl" className="py-6">
         {!currentTeam ? (
           /* No Team Selected State */
-          <div style={{
-            backgroundColor: 'white',
-            borderRadius: '12px',
-            padding: '48px 24px',
-            textAlign: 'center',
-            border: '1px solid #e5e7eb'
-          }}>
-            <Users style={{ 
-              width: '48px', 
-              height: '48px', 
-              color: '#9ca3af', 
-              margin: '0 auto 16px' 
-            }} />
-            <h2 style={{
-              fontSize: '20px',
-              fontWeight: '600',
-              color: '#111827',
-              marginBottom: '8px'
-            }}>
-              No Team Selected
-            </h2>
-            <p style={{
-              color: '#6b7280',
-              marginBottom: '24px',
-              fontSize: '16px'
-            }}>
-              Select a team from the dropdown above or create a new team to get started.
-            </p>
-          </div>
+          <ResponsiveCard padding={true} className="text-center">
+            <div style={{ padding: isMobile ? '32px 16px' : '48px 24px' }}>
+              <Users style={{ 
+                width: '48px', 
+                height: '48px', 
+                color: '#9ca3af', 
+                margin: '0 auto 16px' 
+              }} />
+              <h2 style={{
+                fontSize: isMobile ? '18px' : '20px',
+                fontWeight: '600',
+                color: '#111827',
+                marginBottom: '8px'
+              }}>
+                No Team Selected
+              </h2>
+              <p style={{
+                color: '#6b7280',
+                marginBottom: '24px',
+                fontSize: isMobile ? '14px' : '16px'
+              }}>
+                {isMobile 
+                  ? 'Select a team from the dropdown above or create a new team.'
+                  : 'Select a team from the dropdown above or create a new team to get started.'
+                }
+              </p>
+            </div>
+          </ResponsiveCard>
         ) : (
           /* Team Content */
           <>
@@ -157,7 +212,7 @@ const ProductionTeamDashboard = ({
             )}
             
             {activeView === 'team' && (
-              <TeamMemberManagement
+              <ImprovedTeamMemberManagement
                 currentUser={currentUser}
                 currentTeam={currentTeam}
                 onTeamUpdate={(updatedMembers) => {
@@ -168,7 +223,7 @@ const ProductionTeamDashboard = ({
             )}
           </>
         )}
-      </div>
+      </ResponsiveContainer>
     </div>
   );
 };
