@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { User, Plus, Settings } from 'lucide-react';
 import TeamSelector from './TeamSelector';
+import TeamOnboardingWizard from './TeamOnboardingWizard';
 
 const ProductionPersonalDashboard = ({ 
   currentUser, 
@@ -9,6 +10,7 @@ const ProductionPersonalDashboard = ({
   onCreateTeam 
 }) => {
   const [showCreateTeamHelp, setShowCreateTeamHelp] = useState(false);
+  const [showOnboardingWizard, setShowOnboardingWizard] = useState(false);
 
   if (!currentUser) {
     return (
@@ -124,7 +126,7 @@ const ProductionPersonalDashboard = ({
             cursor: 'pointer',
             transition: 'all 0.2s ease'
           }}
-          onClick={() => setShowCreateTeamHelp(true)}
+          onClick={() => setShowOnboardingWizard(true)}
           onMouseEnter={(e) => {
             e.currentTarget.style.borderColor = '#3b82f6';
             e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.15)';
@@ -270,6 +272,19 @@ const ProductionPersonalDashboard = ({
               </div>
             </div>
           </div>
+        )}
+
+        {/* Team Onboarding Wizard */}
+        {showOnboardingWizard && (
+          <TeamOnboardingWizard
+            currentUser={currentUser}
+            onComplete={(newTeam) => {
+              setShowOnboardingWizard(false);
+              // The onTeamChange will be called automatically by the parent
+            }}
+            onCancel={() => setShowOnboardingWizard(false)}
+            onCreateTeam={onCreateTeam}
+          />
         )}
       </div>
     </div>

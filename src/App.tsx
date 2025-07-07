@@ -9,6 +9,8 @@ import ErrorBoundary from './components/ErrorBoundary';
 import { GlobalErrorHandler } from './components/GlobalErrorHandler';
 import { demoData } from './services/demoData';
 import { enhancedTeamService } from './services/enhancedTeamService';
+import { ToastContainer } from './components/Toast';
+import { useToast } from './hooks/useToast';
 import type { User, Team } from '@/types';
 
 type AppState = 'landing' | 'demo' | 'auth' | 'dashboard' | 'invitation';
@@ -22,6 +24,7 @@ function App() {
   const [invitationToken, setInvitationToken] = useState<string | null>(null);
   const [teamMemberRefreshFn, setTeamMemberRefreshFn] = useState<(() => Promise<void>) | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const toast = useToast();
 
   useEffect(() => {
     // Check for invitation URL first
@@ -204,6 +207,9 @@ function App() {
         role: invitationData.role
       });
 
+      // Show success toast
+      toast.success(`Welcome to ${team?.Name || 'the team'}! You've successfully joined as ${invitationData.role}.`);
+
       // Set app to dashboard mode
       setAppState('dashboard');
       
@@ -250,9 +256,13 @@ function App() {
       setCurrentTeam(newTeam);
       localStorage.setItem('currentTeam', JSON.stringify(newTeam));
       
+      // Show success toast
+      toast.success(`Team "${newTeam.Name || newTeam.name}" created successfully!`);
+      
       return newTeam;
     } catch (error) {
       console.error('Error creating team:', error);
+      toast.error('Failed to create team. Please try again.');
       throw error;
     } finally {
       setIsLoading(false);
@@ -363,6 +373,10 @@ function App() {
     <GlobalErrorHandler>
       <ErrorBoundary level="critical">
         {renderContent()}
+        <ToastContainer 
+          toasts={toast.toasts} 
+          onRemoveToast={toast.removeToast} 
+        />
       </ErrorBoundary>
     </GlobalErrorHandler>
   );
