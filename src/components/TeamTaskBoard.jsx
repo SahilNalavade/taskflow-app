@@ -13,6 +13,12 @@ import DropZone from './DropZone';
 import FilterBar from './FilterBar';
 import { realtimeEngine } from '../services/realtimeEngine';
 import { useMentions } from '../utils/mentionsParser';
+import { TaskCreationModal, QuickActions, BulkOperations } from './ui/EnhancedTaskManagement';
+import { AdvancedSearchBar, FilterPanel, useAdvancedSearch } from './ui/AdvancedSearch';
+import { useKeyboardShortcuts } from './ui/KeyboardShortcuts';
+import { HelpButton } from './ui/HelpSystem';
+import { LoadingWrapper, TaskBoardSkeleton } from './ui/LoadingStates';
+import { useResponsive } from './ui/ResponsiveLayout';
 
 const TeamTaskBoard = ({ 
   currentUser, 
@@ -41,8 +47,43 @@ const TeamTaskBoard = ({
     dueDate: ''
   });
 
+  // Enhanced Task Management State
+  const [showTaskCreationModal, setShowTaskCreationModal] = useState(false);
+  const [selectedTasks, setSelectedTasks] = useState([]);
+  const [showFilterPanel, setShowFilterPanel] = useState(false);
+  const { isMobile } = useResponsive();
+
   // Initialize mentions functionality
   const { processMentionsInComment, renderMentionsAsHTML } = useMentions(teamMembers);
+
+  // Advanced search and filtering
+  const searchConfig = {
+    searchFields: ['title', 'description', 'assigneeName']
+  };
+  
+  const {
+    query,
+    setQuery,
+    filters,
+    setFilters,
+    results: searchResults,
+    resultCount,
+    totalCount: searchTotalCount,
+    clearFilters: clearSearchFilters
+  } = useAdvancedSearch(allTasks, searchConfig);
+
+  // Keyboard shortcuts
+  useKeyboardShortcuts({
+    'MOD+N': () => setShowTaskCreationModal(true),
+    'MOD+F': () => document.querySelector('[data-search-input]')?.focus(),
+    'MOD+A': () => setSelectedTasks(allTasks.map(t => t.id)),
+    'MOD+SHIFT+A': () => setSelectedTasks([]),
+    'ESC': () => {
+      setShowTaskCreationModal(false);
+      setShowTaskModal(false);
+      setSelectedTasks([]);
+    }
+  });
 
   // Helper function to organize tasks by status
   const organizeTasksByStatus = (tasks) => {
@@ -80,6 +121,12 @@ const TeamTaskBoard = ({
     const organizedFiltered = organizeTasksByStatus(filteredTasks);
     setFilteredTasksByStatus(organizedFiltered);
   }, []);
+
+  // Update filtered tasks when search results change
+  useEffect(() => {
+    const organizedSearchResults = organizeTasksByStatus(searchResults);
+    setFilteredTasksByStatus(organizedSearchResults);
+  }, [searchResults]);
 
   const statusColumns = [
     { key: 'pending', title: 'To Do', color: '#6b7280', bgColor: '#f3f4f6' },
@@ -228,6 +275,81 @@ const TeamTaskBoard = ({
     }
   };
 
+  // Enhanced task creation with templates
+  const handleEnhancedTaskCreate = async (taskData) => {
+    try {
+      const enhancedTaskData = {
+        ...taskData,
+        createdBy: currentUser.id,
+        createdByName: currentUser.name,
+        status: 'pending', // Default status
+        id: Date.now().toString() // Temporary ID generation
+      };
+
+      if (onTaskCreate) {
+        await onTaskCreate(enhancedTaskData);
+      } else {
+        await demoTeamService.createTask(enhancedTaskData);
+        realtimeEngine.emit('task_created', enhancedTaskData);
+        await loadData();
+      }
+    } catch (error) {
+      console.error('Error creating enhanced task:', error);
+      throw error;
+    }
+  };
+
+  // Quick action handler
+  const handleQuickCreate = (template) => {
+    setShowTaskCreationModal(true);
+    // Template will be applied in the modal
+  };
+
+  // Bulk operations handlers
+  const handleBulkUpdate = async (tasks) => {
+    try {
+      const promises = tasks.map(task => {
+        if (onTaskUpdate) {
+          return onTaskUpdate(task.id, task);
+        } else {
+          return demoTeamService.updateTask(task.id, task);
+        }
+      });
+
+      await Promise.all(promises);
+      
+      if (!onTaskUpdate) {
+        await loadData();
+      }
+      
+      setSelectedTasks([]);
+    } catch (error) {
+      console.error('Error updating tasks in bulk:', error);
+    }
+  };
+
+  const handleBulkDelete = async (tasks) => {
+    try {
+      const promises = tasks.map(task => {
+        if (onTaskDelete) {
+          return onTaskDelete(task.id);
+        } else {
+          return demoTeamService.deleteTask(task.id);
+        }
+      });
+
+      await Promise.all(promises);
+      
+      if (!onTaskDelete) {
+        await loadData();
+      }
+      
+      setSelectedTasks([]);
+    } catch (error) {
+      console.error('Error deleting tasks in bulk:', error);
+    }
+  };
+
   const getPriorityColor = (priority) => {
     switch (priority) {
       case 'High': return '#ef4444';
@@ -253,26 +375,10 @@ const TeamTaskBoard = ({
 
   if (loading) {
     return (
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: '400px',
-        color: '#6b7280'
-      }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{
-            width: '32px',
-            height: '32px',
-            border: '3px solid #f3f4f6',
-            borderTop: '3px solid #3b82f6',
-            borderRadius: '50%',
-            animation: 'spin 1s linear infinite',
-            margin: '0 auto 16px'
-          }} />
-          Loading team board...
-        </div>
-      </div>
+      <LoadingWrapper
+        loading={true}
+        skeleton={<TaskBoardSkeleton isMobile={isMobile} />}
+      />
     );
   }
 
@@ -545,6 +651,26 @@ const TeamTaskBoard = ({
         </div>
       )}
 
+      {/* Enhanced Task Creation Modal */}
+      <TaskCreationModal
+        isOpen={showTaskCreationModal}
+        onClose={() => setShowTaskCreationModal(false)}
+        onCreateTask={handleEnhancedTaskCreate}
+        teamMembers={teamMembers}
+        currentUser={currentUser}
+      />
+
+      {/* Bulk Operations */}
+      {selectedTasks.length > 0 && (
+        <BulkOperations
+          selectedTasks={selectedTasks.map(taskId => allTasks.find(t => t.id === taskId)).filter(Boolean)}
+          onBulkUpdate={handleBulkUpdate}
+          onBulkDelete={handleBulkDelete}
+          onCancel={() => setSelectedTasks([])}
+          teamMembers={teamMembers}
+        />
+      )}
+
       {/* Main Board with Drag & Drop */}
       <DndProvider backend={HTML5Backend}>
         <CollaborativeCursor
@@ -552,54 +678,153 @@ const TeamTaskBoard = ({
           showCursors={true}
         >
           <div style={{ padding: '24px' }}>
-            {/* Header */}
+            {/* Enhanced Header */}
             <div style={{
               display: 'flex',
+              flexDirection: isMobile ? 'column' : 'row',
               justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '24px'
+              alignItems: isMobile ? 'stretch' : 'center',
+              marginBottom: '24px',
+              gap: isMobile ? '16px' : '0'
             }}>
               <div>
                 <h2 style={{
-                  fontSize: '24px',
+                  fontSize: isMobile ? '20px' : '24px',
                   fontWeight: 'bold',
                   color: '#111827',
                   marginBottom: '4px'
                 }}>
                   Team Task Board
                 </h2>
-                <p style={{ color: '#6b7280', margin: 0 }}>
-                  Collaborate with your team • Drag tasks to change status
+                <p style={{ color: '#6b7280', margin: 0, fontSize: isMobile ? '14px' : '16px' }}>
+                  Collaborate with your team • Use ⌘+N to create tasks quickly
                 </p>
               </div>
-              <button
-                onClick={() => setShowNewTaskForm(true)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '10px 16px',
-                  backgroundColor: '#3b82f6',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  cursor: 'pointer'
-                }}
-              >
-                <Plus style={{ width: '16px', height: '16px' }} />
-                New Task
-              </button>
+              
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '12px',
+                flexDirection: isMobile ? 'column' : 'row'
+              }}>
+                <button
+                  onClick={() => setShowTaskCreationModal(true)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '10px 16px',
+                    backgroundColor: '#3b82f6',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    minHeight: '44px',
+                    width: isMobile ? '100%' : 'auto',
+                    justifyContent: 'center'
+                  }}
+                >
+                  <Plus style={{ width: '16px', height: '16px' }} />
+                  {isMobile ? 'Create Task' : 'New Task'}
+                </button>
+                <HelpButton
+                  content={{
+                    title: "Task Board Help",
+                    description: "Manage your team's tasks with drag-and-drop, templates, and advanced filtering.",
+                    sections: [
+                      {
+                        title: "Keyboard Shortcuts",
+                        items: [
+                          "⌘+N - Create new task",
+                          "⌘+F - Focus search",
+                          "⌘+A - Select all tasks",
+                          "ESC - Close modals"
+                        ]
+                      },
+                      {
+                        title: "Quick Actions",
+                        items: [
+                          "Use templates for common task types",
+                          "Bulk edit multiple tasks at once",
+                          "Drag tasks between columns",
+                          "Filter by assignee, priority, or date"
+                        ]
+                      }
+                    ]
+                  }}
+                />
+              </div>
             </div>
 
-            {/* Filter Bar */}
-            <FilterBar
-              tasks={allTasks}
-              teamMembers={teamMembers}
-              onFiltersChange={handleFiltersChange}
-              initialFilters={activeFilters}
-            />
+            {/* Quick Actions */}
+            <QuickActions onQuickCreate={handleQuickCreate} />
+
+            {/* Enhanced Search and Filter Bar */}
+            <div style={{
+              display: 'flex',
+              flexDirection: isMobile ? 'column' : 'row',
+              gap: '12px',
+              marginBottom: '24px',
+              alignItems: isMobile ? 'stretch' : 'center'
+            }}>
+              <AdvancedSearchBar
+                onSearch={setQuery}
+                placeholder="Search tasks..."
+                data-search-input="true"
+                style={{ flex: 1 }}
+              />
+              
+              <FilterPanel
+                filters={filters}
+                onFiltersChange={setFilters}
+                options={{
+                  assignee: teamMembers.map(member => ({
+                    value: member.id,
+                    label: member.name
+                  }))
+                }}
+                isOpen={showFilterPanel}
+                onToggle={() => setShowFilterPanel(!showFilterPanel)}
+              />
+            </div>
+
+            {/* Search Results Summary */}
+            {(query || Object.keys(filters).length > 0) && (
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{
+                  padding: '12px 16px',
+                  backgroundColor: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  color: '#64748b'
+                }}>
+                  Showing {resultCount} of {searchTotalCount} tasks
+                  {query && ` for "${query}"`}
+                  {Object.keys(filters).length > 0 && ` with ${Object.keys(filters).length} filter${Object.keys(filters).length !== 1 ? 's' : ''}`}
+                  <button
+                    onClick={() => {
+                      setQuery('');
+                      setFilters({});
+                    }}
+                    style={{
+                      marginLeft: '12px',
+                      padding: '4px 8px',
+                      backgroundColor: 'transparent',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '4px',
+                      fontSize: '12px',
+                      cursor: 'pointer',
+                      color: '#64748b'
+                    }}
+                  >
+                    Clear all
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Drag & Drop Kanban Board */}
             <div style={{
