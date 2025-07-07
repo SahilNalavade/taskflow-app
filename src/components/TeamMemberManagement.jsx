@@ -96,6 +96,7 @@ const TeamMemberManagement = ({ currentUser, currentTeam, onTeamUpdate, onMember
 
   // Load team members and pending invitations
   useEffect(() => {
+    console.log('TeamMemberManagement - currentTeam changed:', currentTeam);
     loadTeamData();
   }, [currentTeam]);
 
@@ -185,8 +186,12 @@ const TeamMemberManagement = ({ currentUser, currentTeam, onTeamUpdate, onMember
       return;
     }
 
+    console.log('Current team in invitation:', currentTeam);
+    console.log('Team ID check:', currentTeam?.id);
+    console.log('Team keys:', currentTeam ? Object.keys(currentTeam) : 'No team');
+    
     if (!currentTeam?.id) {
-      setInviteStatus({ type: 'error', message: 'No team selected' });
+      setInviteStatus({ type: 'error', message: `No team selected. Team data: ${JSON.stringify(currentTeam)}` });
       return;
     }
 

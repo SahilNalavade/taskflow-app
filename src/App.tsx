@@ -63,6 +63,7 @@ function App() {
       
       // If user has teams, set the first one as current
       if (teams.length > 0) {
+        console.log('Setting current team:', teams[0]);
         setCurrentTeam(teams[0]);
         localStorage.setItem('currentTeam', JSON.stringify(teams[0]));
       } else {
@@ -93,6 +94,7 @@ function App() {
         role: 'Admin'
       });
 
+      console.log('Created default team:', defaultTeam);
       setCurrentTeam(defaultTeam);
       localStorage.setItem('currentTeam', JSON.stringify(defaultTeam));
     } catch (error) {
