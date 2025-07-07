@@ -112,6 +112,12 @@ const InvitationAcceptance = ({ token, onUserJoin }) => {
         await enhancedTeamService.updateInvitationStatus(invitationData.invitationId, 'Accepted');
       }
 
+      console.log('User successfully added to team:', {
+        userId: user.id,
+        teamId: invitationData.teamId,
+        role: invitationData.role
+      });
+
       // Create user object for app state
       const appUser = {
         id: user.id,

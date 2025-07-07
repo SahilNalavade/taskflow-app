@@ -13,7 +13,7 @@ import { demoData } from '../services/demoData';
 import { realtimeEngine } from '../services/realtimeEngine';
 import { sheetSyncService } from '../services/sheetSyncService';
 
-const DemoCollaboration = ({ onSignUp, currentUser, currentTeam, onTeamChange, onCreateTeam, isAuthenticatedMode = false }) => {
+const DemoCollaboration = ({ onSignUp, currentUser, currentTeam, onTeamChange, onCreateTeam, onMemberRefresh, isAuthenticatedMode = false }) => {
   const [activeView, setActiveView] = useState('board'); // 'board', 'activity', 'overview'
   const user = currentUser || demoData.user;
 
@@ -480,6 +480,7 @@ const DemoCollaboration = ({ onSignUp, currentUser, currentTeam, onTeamChange, o
               onTeamUpdate={(updatedMembers) => {
                 console.log('Team updated:', updatedMembers);
               }}
+              onMemberRefresh={onMemberRefresh}
             />
           </div>
         )}

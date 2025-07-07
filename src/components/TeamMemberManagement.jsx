@@ -10,7 +10,7 @@ import { realtimeEngine } from '../services/realtimeEngine';
 import { emailService } from '../services/emailService';
 import { enhancedTeamService } from '../services/enhancedTeamService';
 
-const TeamMemberManagement = ({ currentUser, currentTeam, onTeamUpdate }) => {
+const TeamMemberManagement = ({ currentUser, currentTeam, onTeamUpdate, onMemberRefresh }) => {
   const [teamMembers, setTeamMembers] = useState(demoData.teamMembers || []);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showRoleModal, setShowRoleModal] = useState(false);
@@ -25,6 +25,7 @@ const TeamMemberManagement = ({ currentUser, currentTeam, onTeamUpdate }) => {
   const [inviteStatus, setInviteStatus] = useState(null);
   const [pendingInvitations, setPendingInvitations] = useState([]);
   const [showEmailPreview, setShowEmailPreview] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const roles = [
     {
@@ -110,6 +111,7 @@ const TeamMemberManagement = ({ currentUser, currentTeam, onTeamUpdate }) => {
     try {
       // Load team members from database
       const members = await enhancedTeamService.getTeamMembers(currentTeam.id);
+      console.log('Loaded team members:', members);
       setTeamMembers(members);
 
       // Load pending invitations (this could be enhanced to filter by team)
@@ -121,6 +123,26 @@ const TeamMemberManagement = ({ currentUser, currentTeam, onTeamUpdate }) => {
       setTeamMembers(demoData.teamMembers || []);
     }
   };
+
+  // Refresh function that can be called externally
+  const refreshTeamData = async () => {
+    setRefreshing(true);
+    try {
+      await loadTeamData();
+      console.log('Team data refreshed successfully');
+    } catch (error) {
+      console.error('Error refreshing team data:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  // Expose refresh function to parent component
+  useEffect(() => {
+    if (onMemberRefresh && typeof onMemberRefresh === 'function') {
+      onMemberRefresh(refreshTeamData);
+    }
+  }, [onMemberRefresh]);
 
   const memberStats = {
     'sarah_chen': {
@@ -333,9 +355,22 @@ const TeamMemberManagement = ({ currentUser, currentTeam, onTeamUpdate }) => {
               fontSize: '20px',
               fontWeight: '600',
               color: '#111827',
-              marginBottom: '4px'
+              marginBottom: '4px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
             }}>
               Team Members ({teamMembers.length})
+              {refreshing && (
+                <div style={{
+                  width: '16px',
+                  height: '16px',
+                  border: '2px solid #e5e7eb',
+                  borderTop: '2px solid #3b82f6',
+                  borderRadius: '50%',
+                  animation: 'spin 1s linear infinite'
+                }} />
+              )}
             </h2>
             <p style={{ color: '#6b7280', margin: 0, fontSize: '14px' }}>
               Manage team access, roles, and permissions

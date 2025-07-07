@@ -20,6 +20,7 @@ function App() {
   const [user, setUser] = useState<User | null>(null);
   const [currentTeam, setCurrentTeam] = useState<Team | null>(null);
   const [invitationToken, setInvitationToken] = useState<string | null>(null);
+  const [teamMemberRefreshFn, setTeamMemberRefreshFn] = useState<(() => Promise<void>) | null>(null);
 
   useEffect(() => {
     // Check for invitation URL first
@@ -204,6 +205,18 @@ function App() {
     window.history.replaceState({}, document.title, '/');
     setInvitationToken(null);
     setAppState('team');
+    
+    // Trigger team member list refresh after a short delay to ensure UI is ready
+    setTimeout(async () => {
+      if (teamMemberRefreshFn) {
+        try {
+          await teamMemberRefreshFn();
+          console.log('Team member list refreshed after user join');
+        } catch (error) {
+          console.error('Error refreshing team member list:', error);
+        }
+      }
+    }, 1000);
   };
 
   const handleCreateTeam = async (teamData: { name: string; description?: string }) => {
@@ -337,6 +350,7 @@ function App() {
                   currentTeam={currentTeam}
                   onTeamChange={handleTeamChange}
                   onCreateTeam={handleCreateTeam}
+                  onMemberRefresh={setTeamMemberRefreshFn}
                   onSignUp={() => {
                     // Already authenticated, so maybe show upgrade options
                     console.log('User already authenticated, showing team features');

@@ -159,18 +159,31 @@ class EnhancedTeamService {
     if (this.useAirtable) {
       const members = await airtableService.getTeamMembers(teamId);
       
-      // Fetch user details for each member
+      // Fetch user details for each member and format for TeamMemberManagement
       const membersWithUsers = await Promise.all(
         members.map(async (member) => {
           const user = await this.getUserById(member.User[0]);
+          if (!user) {
+            console.warn(`User not found for member:`, member);
+            return null;
+          }
+          
           return {
-            ...member,
-            user: user
+            id: user.id,
+            name: user.Name || user.name || 'Unknown',
+            email: user.Email || user.email || '',
+            role: member.Role || 'member',
+            status: 'active',
+            avatar: (user.Name || user.name || '').split(' ').map(n => n[0]).join('').toUpperCase(),
+            joinedAt: member.createdTime,
+            membershipId: member.id,
+            profilePicture: user['Profile Picture'] || user.profilePicture || ''
           };
         })
       );
       
-      return membersWithUsers;
+      // Filter out null entries
+      return membersWithUsers.filter(Boolean);
     } else {
       return legacyTeamService.getTeamMembers(teamId);
     }
