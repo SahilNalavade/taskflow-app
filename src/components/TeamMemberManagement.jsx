@@ -5,13 +5,12 @@ import {
   Edit3, Trash2, MoreHorizontal, Check, X, Send,
   Clock, CheckCircle, XCircle, RotateCcw, Eye
 } from 'lucide-react';
-import { demoData } from '../services/demoData';
 import { realtimeEngine } from '../services/realtimeEngine';
 import { emailService } from '../services/emailService';
 import { enhancedTeamService } from '../services/enhancedTeamService';
 
 const TeamMemberManagement = ({ currentUser, currentTeam, onTeamUpdate, onMemberRefresh }) => {
-  const [teamMembers, setTeamMembers] = useState(demoData.teamMembers || []);
+  const [teamMembers, setTeamMembers] = useState([]);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showRoleModal, setShowRoleModal] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
@@ -102,8 +101,8 @@ const TeamMemberManagement = ({ currentUser, currentTeam, onTeamUpdate, onMember
 
   const loadTeamData = async () => {
     if (!currentTeam?.id) {
-      // Use demo data if no team selected
-      setTeamMembers(demoData.teamMembers || []);
+      // No team selected - clear members
+      setTeamMembers([]);
       const pending = emailService.getPendingInvitations();
       setPendingInvitations(pending);
       return;
@@ -120,8 +119,8 @@ const TeamMemberManagement = ({ currentUser, currentTeam, onTeamUpdate, onMember
       setPendingInvitations(pending);
     } catch (error) {
       console.error('Error loading team data:', error);
-      // Fallback to demo data
-      setTeamMembers(demoData.teamMembers || []);
+      // On error, clear members rather than showing demo data
+      setTeamMembers([]);
     }
   };
 

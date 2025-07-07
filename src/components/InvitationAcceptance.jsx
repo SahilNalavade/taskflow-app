@@ -72,78 +72,15 @@ const InvitationAcceptance = ({ token, onUserJoin }) => {
     }
   };
 
-  const handleAcceptInvitation = async () => {
-    if (!userInfo.name.trim()) {
-      setError('Please enter your name');
-      return;
-    }
-
-    if (userInfo.password && userInfo.password !== userInfo.confirmPassword) {
-      setError('Passwords do not match');
-      return;
-    }
-
-    setAccepting(true);
-    setError(null);
-
-    try {
-      // Create or get user in database
-      let user = await enhancedTeamService.getUserByEmail(invitationData.email);
-      
-      if (!user) {
-        // Create new user
-        user = await enhancedTeamService.createUser({
-          name: userInfo.name,
-          email: invitationData.email,
-          googleId: '', // Will be filled when they sign in with Google
-          profilePicture: ''
-        });
-      }
-
-      // Add user to team
-      await enhancedTeamService.addTeamMember({
-        userId: user.id,
-        teamId: invitationData.teamId,
-        role: invitationData.role
-      });
-
-      // Update invitation status if we have invitation ID
-      if (invitationData.invitationId) {
-        await enhancedTeamService.updateInvitationStatus(invitationData.invitationId, 'Accepted');
-      }
-
-      console.log('User successfully added to team:', {
-        userId: user.id,
-        teamId: invitationData.teamId,
-        role: invitationData.role
-      });
-
-      // Create user object for app state
-      const appUser = {
-        id: user.id,
-        name: user.Name || userInfo.name,
-        email: user.Email || invitationData.email,
-        role: invitationData.role,
-        status: 'active',
-        joinedAt: new Date().toISOString(),
-        teamId: invitationData.teamId,
-        teamName: invitationData.teamName,
-        avatar: userInfo.name.split(' ').map(n => n[0]).join('').toUpperCase()
-      };
-
-      // Notify parent component
-      if (onUserJoin) {
-        onUserJoin(appUser);
-      }
-
-      // Store user info locally
-      localStorage.setItem('currentUser', JSON.stringify(appUser));
-
-    } catch (error) {
-      console.error('Error accepting invitation:', error);
-      setError('Failed to accept invitation. Please try again.');
-      setAccepting(false);
-    }
+  const handleAcceptInvitation = () => {
+    // Store invitation data for after authentication
+    localStorage.setItem('pendingInvitation', JSON.stringify({
+      invitationData,
+      token
+    }));
+    
+    // Redirect to Google Sign-In
+    window.location.href = '/?auth=true';
   };
 
   const getRoleIcon = (role) => {
@@ -419,66 +356,29 @@ const InvitationAcceptance = ({ token, onUserJoin }) => {
             </ul>
           </div>
 
-          {/* User Information Form */}
+          {/* Invitation Details */}
           <div style={{ marginBottom: '32px' }}>
-            <h3 style={{
-              fontSize: '18px',
-              fontWeight: '600',
-              color: '#111827',
-              marginBottom: '16px'
+            <div style={{
+              backgroundColor: '#f0f9ff',
+              borderRadius: '8px',
+              padding: '20px',
+              border: '1px solid #e0f2fe'
             }}>
-              Complete your profile
-            </h3>
-            
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{
-                display: 'block',
-                fontSize: '14px',
-                fontWeight: '500',
-                color: '#374151',
-                marginBottom: '4px'
+              <h3 style={{
+                fontSize: '16px',
+                fontWeight: '600',
+                color: '#0369a1',
+                marginBottom: '8px'
               }}>
-                Full Name *
-              </label>
-              <input
-                type="text"
-                value={userInfo.name}
-                onChange={(e) => setUserInfo({ ...userInfo, name: e.target.value })}
-                placeholder="Enter your full name"
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '8px',
-                  fontSize: '14px'
-                }}
-              />
-            </div>
-
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{
-                display: 'block',
+                You're invited to join {invitationData.teamName}
+              </h3>
+              <p style={{
+                color: '#0284c7',
                 fontSize: '14px',
-                fontWeight: '500',
-                color: '#374151',
-                marginBottom: '4px'
+                margin: 0
               }}>
-                Email Address
-              </label>
-              <input
-                type="email"
-                value={invitationData.email}
-                disabled
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  backgroundColor: '#f9fafb',
-                  color: '#6b7280'
-                }}
-              />
+                Email: {invitationData.email}
+              </p>
             </div>
           </div>
 
@@ -500,17 +400,16 @@ const InvitationAcceptance = ({ token, onUserJoin }) => {
           {/* Accept Button */}
           <button
             onClick={handleAcceptInvitation}
-            disabled={!userInfo.name.trim() || accepting}
             style={{
               width: '100%',
               padding: '14px',
-              backgroundColor: userInfo.name.trim() ? '#3b82f6' : '#9ca3af',
+              backgroundColor: '#3b82f6',
               color: 'white',
               border: 'none',
               borderRadius: '8px',
               fontSize: '16px',
               fontWeight: '600',
-              cursor: userInfo.name.trim() ? 'pointer' : 'not-allowed',
+              cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -518,7 +417,7 @@ const InvitationAcceptance = ({ token, onUserJoin }) => {
             }}
           >
             <CheckCircle style={{ width: '16px', height: '16px' }} />
-            Accept Invitation & Join Team
+            Sign in with Google to Accept
           </button>
 
           {/* Expiration Notice */}

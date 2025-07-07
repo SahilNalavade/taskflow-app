@@ -3,7 +3,8 @@ import SimpleOnboarding from './components/SimpleOnboarding';
 import DemoTaskManager from './components/DemoTaskManager';
 import DemoCollaboration from './components/DemoCollaboration';
 import GoogleSignIn from './components/GoogleSignIn';
-import EnhancedPersonalManager from './components/EnhancedPersonalManager';
+import ProductionPersonalDashboard from './components/ProductionPersonalDashboard';
+import ProductionTeamDashboard from './components/ProductionTeamDashboard';
 import InvitationAcceptance from './components/InvitationAcceptance';
 import ErrorBoundary from './components/ErrorBoundary';
 import { GlobalErrorHandler } from './components/GlobalErrorHandler';
@@ -31,6 +32,18 @@ function App() {
       const token = urlMatch[1];
       setInvitationToken(token);
       setAppState('invitation');
+      return;
+    }
+    
+    // Check for auth redirect from invitation
+    const urlParams = new URLSearchParams(window.location.search);
+    const authParam = urlParams.get('auth');
+    const pendingInvitation = localStorage.getItem('pendingInvitation');
+    
+    if (authParam === 'true' && pendingInvitation) {
+      // Clear the URL parameter
+      window.history.replaceState({}, document.title, '/');
+      setAppState('auth');
       return;
     }
     
@@ -82,41 +95,23 @@ function App() {
         console.log('Setting current team:', teams[0]);
         setCurrentTeam(teams[0]);
         localStorage.setItem('currentTeam', JSON.stringify(teams[0]));
+        localStorage.setItem('appMode', 'team');
+        setAppState('team');
       } else {
-        // Auto-create a default team for the user
-        await createDefaultTeam(userId);
+        // User has no teams - they need to create one or be invited
+        console.log('User has no teams - showing onboarding');
+        setCurrentTeam(null);
+        localStorage.removeItem('currentTeam');
+        localStorage.setItem('appMode', 'personal');
+        setAppState('personal');
       }
     } catch (error) {
       console.error('Error loading user teams:', error);
+      // On error, default to personal mode
+      setAppState('personal');
     }
   };
 
-  const createDefaultTeam = async (userId: string) => {
-    try {
-      const user = await enhancedTeamService.getUserById(userId);
-      if (!user) return;
-      
-      // Create default team
-      const defaultTeam = await enhancedTeamService.createTeam({
-        name: `${user.Name || user.name || 'My'} Team`,
-        description: 'Default team workspace',
-        ownerId: userId
-      });
-
-      // Add user as team owner
-      await enhancedTeamService.addTeamMember({
-        userId: userId,
-        teamId: defaultTeam.id,
-        role: 'Admin'
-      });
-
-      console.log('Created default team:', defaultTeam);
-      setCurrentTeam(defaultTeam);
-      localStorage.setItem('currentTeam', JSON.stringify(defaultTeam));
-    } catch (error) {
-      console.error('Error creating default team:', error);
-    }
-  };
 
   const handleTeamChange = (team: Team | null) => {
     setCurrentTeam(team);
@@ -172,6 +167,14 @@ function App() {
       setUser(updatedUser);
       localStorage.setItem('user', JSON.stringify(updatedUser));
       
+      // Check for pending invitation first
+      const pendingInvitation = localStorage.getItem('pendingInvitation');
+      if (pendingInvitation) {
+        await handlePendingInvitation(JSON.parse(pendingInvitation), dbUser);
+        localStorage.removeItem('pendingInvitation');
+        return;
+      }
+      
       // Load user's teams and set up team context
       await loadUserTeams(dbUser.id);
       
@@ -200,6 +203,59 @@ function App() {
   const handleAuthError = (error: Error) => {
     console.error('Authentication error:', error);
     // Could show error toast here
+  };
+
+  const handlePendingInvitation = async (pendingData: any, dbUser: any) => {
+    try {
+      const { invitationData } = pendingData;
+      
+      // Add user to team
+      await enhancedTeamService.addTeamMember({
+        userId: dbUser.id,
+        teamId: invitationData.teamId,
+        role: invitationData.role
+      });
+
+      // Update invitation status if we have invitation ID
+      if (invitationData.invitationId) {
+        await enhancedTeamService.updateInvitationStatus(invitationData.invitationId, 'Accepted');
+      }
+
+      // Load the team user just joined
+      const team = await enhancedTeamService.getTeamById(invitationData.teamId);
+      if (team) {
+        setCurrentTeam(team);
+        localStorage.setItem('currentTeam', JSON.stringify(team));
+      }
+
+      console.log('User successfully added to team via invitation:', {
+        userId: dbUser.id,
+        teamId: invitationData.teamId,
+        role: invitationData.role
+      });
+
+      // Set app to team mode
+      localStorage.setItem('appMode', 'team');
+      setAppState('team');
+      
+      // Trigger team member list refresh after a short delay
+      setTimeout(async () => {
+        if (teamMemberRefreshFn) {
+          try {
+            await teamMemberRefreshFn();
+            console.log('Team member list refreshed after invitation acceptance');
+          } catch (error) {
+            console.error('Error refreshing team member list:', error);
+          }
+        }
+      }, 1000);
+      
+    } catch (error) {
+      console.error('Error processing pending invitation:', error);
+      // Still proceed to normal flow
+      await loadUserTeams(dbUser.id);
+      setAppState('personal');
+    }
   };
 
   const handleUserJoin = async (userData: User) => {
@@ -316,10 +372,11 @@ function App() {
           <ErrorBoundary level="page">
             <div style={{ position: 'relative' }}>
               <ErrorBoundary level="component">
-                <EnhancedPersonalManager
-                  user={user}
+                <ProductionPersonalDashboard
+                  currentUser={user}
                   currentTeam={currentTeam}
-                  onTasksUpdate={() => {}}
+                  onTeamChange={handleTeamChange}
+                  onCreateTeam={handleCreateTeam}
                 />
               </ErrorBoundary>
               
@@ -365,17 +422,12 @@ function App() {
           <ErrorBoundary level="page">
             <div style={{ position: 'relative' }}>
               <ErrorBoundary level="component">
-                <DemoCollaboration
+                <ProductionTeamDashboard
                   currentUser={user}
                   currentTeam={currentTeam}
                   onTeamChange={handleTeamChange}
                   onCreateTeam={handleCreateTeam}
                   onMemberRefresh={setTeamMemberRefreshFn}
-                  onSignUp={() => {
-                    // Already authenticated, so maybe show upgrade options
-                    console.log('User already authenticated, showing team features');
-                  }}
-                  isAuthenticatedMode={true}
                 />
               </ErrorBoundary>
               
